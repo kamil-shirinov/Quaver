@@ -37,11 +37,23 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+# lean/faber_etf/logic.py, imported by main.py inside QuantConnect and by the tests.
+known-local-folder = ["logic"]
+
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["src", "tests"]
+files = ["src", "tests", "lean/faber_etf"]
+mypy_path = "lean/faber_etf"
+# main.py imports AlgorithmImports, which exists only inside QuantConnect.
+exclude = ["^lean/faber_etf/main\\.py$"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --cov=quaver --cov-report=term-missing --cov-fail-under=100"
+pythonpath = ["lean/faber_etf"]
+addopts = "-q --cov=quaver --cov=lean/faber_etf --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+# main.py runs only inside QuantConnect; its arithmetic is in logic.py, which is measured.
+omit = ["lean/faber_etf/main.py"]

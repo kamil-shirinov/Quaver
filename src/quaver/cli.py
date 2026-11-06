@@ -12,6 +12,7 @@ from quaver.data import DataError, load_french10
 from quaver.quotes import check_quotes, load_pages
 from quaver.readings import claim_key, compare_claims, describe_key, load_claims, locate
 from quaver.spec import Provenance, StrategySpec, load_spec, provenance_counts
+from quaver.test1 import RunRefused, run_test1
 
 DEFAULT_CSV = Path("data/raw/10_Industry_Portfolios.csv")
 DEFAULT_PINS = Path("data/pins.json")
@@ -115,6 +116,20 @@ def _data_check(csv: Path, pins: Path) -> int:
     return 0
 
 
+def _run_test1(rerun: str | None) -> int:
+    try:
+        outcome = run_test1(Path.cwd(), rerun)
+    except RunRefused as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
+    print(
+        f"Test 1 (reproduce): {outcome.verdict}, {outcome.within} of {outcome.total} "
+        "strategy claims within tolerance"
+    )
+    print(f"wrote {outcome.result_path} and {outcome.report_path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="quaver")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -135,7 +150,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     check.add_argument("--csv", type=Path, default=DEFAULT_CSV)
     check.add_argument("--pins", type=Path, default=DEFAULT_PINS)
+    test1 = subparsers.add_parser(
+        "run-test1", help="run Test 1 (reproduce) of pre-registration 0001; it runs once"
+    )
+    test1.add_argument(
+        "--rerun",
+        metavar="REASON",
+        help="run again although a result exists; the old result is kept and the reason recorded",
+    )
     args = parser.parse_args(argv)
+    if args.command == "run-test1":
+        return _run_test1(args.rerun)
     if args.command == "data-check":
         return _data_check(args.csv, args.pins)
     if args.command == "check-quotes":

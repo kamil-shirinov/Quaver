@@ -1,16 +1,19 @@
 """Strategy spec format: a paper's method, with a citation for every field."""
 
 import re
+from collections.abc import Iterator
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Self
 
 import yaml
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 MAX_QUOTE_WORDS = 25
 
 _YEAR_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class Provenance(StrEnum):
@@ -19,6 +22,20 @@ class Provenance(StrEnum):
     STATED = "stated"
     INFERRED = "inferred"
     ASSUMED = "assumed"
+
+
+class Subject(StrEnum):
+    """What a claim is about: the strategy itself, or the benchmark it is compared with."""
+
+    STRATEGY = "strategy"
+    BENCHMARK = "benchmark"
+
+
+class ExtractionMethod(StrEnum):
+    """How the spec was extracted from the paper."""
+
+    HAND = "hand"
+    AI_DRAFTED = "ai-drafted, human-verified"
 
 
 def _check_year_month(value: str) -> str:
@@ -37,7 +54,21 @@ def _check_month_list(values: list[int]) -> list[int]:
     return values
 
 
+def _parse_iso_date(value: object) -> date:
+    # YAML turns an unquoted 2026-11-06 into a date and a quoted one into a string; accept both,
+    # but nothing else (no datetimes, no timestamps, no other string formats).
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and _ISO_DATE.fullmatch(value):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+    raise ValueError(f"{value!r} is not a YYYY-MM-DD date")
+
+
 type YearMonth = Annotated[str, AfterValidator(_check_year_month)]
+type IsoDate = Annotated[date, BeforeValidator(_parse_iso_date)]
 type PositiveAscendingInts = Annotated[list[int], AfterValidator(_check_month_list)]
 
 
@@ -91,14 +122,24 @@ class Paper(_Frozen):
     pdf_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class Extraction(_Frozen):
+    """Who drafted the spec, how, and whether a human has verified it against the paper."""
+
+    method: ExtractionMethod
+    drafted_by: str
+    verified_by: str | None
+    date: IsoDate
+
+
 class Claim(_Frozen):
     """One headline number the paper reports, to be checked by the replication."""
 
     id: str = Field(pattern=r"^C\d+$")
+    subject: Subject
     statement: str
     metric: str
-    lookback_months: int
-    top_n: int
+    lookback_months: int | None = None
+    top_n: int | None = None
     period_start: YearMonth
     period_end: YearMonth
     value: float
@@ -106,7 +147,12 @@ class Claim(_Frozen):
     source: Source
 
     @model_validator(mode="after")
-    def _check_period_order(self) -> Self:
+    def _check_claim(self) -> Self:
+        params = (self.lookback_months, self.top_n)
+        if self.subject is Subject.STRATEGY and None in params:
+            raise ValueError("a strategy claim needs lookback_months and top_n")
+        if self.subject is Subject.BENCHMARK and params != (None, None):
+            raise ValueError("a benchmark claim must have null lookback_months and top_n")
         if self.period_start > self.period_end:
             raise ValueError("period_start must not be after period_end")
         return self
@@ -116,6 +162,7 @@ class StrategySpec(_Frozen):
     """A momentum strategy as written in a paper, every field cited."""
 
     paper: Paper
+    extraction: Extraction
     universe: Cited[str]
     data_source: Cited[str]
     frequency: Cited[str]
@@ -141,10 +188,11 @@ class StrategySpec(_Frozen):
         if len(set(ids)) != len(ids):
             problems.append("claim ids must be unique")
         for claim in self.claims:
-            if claim.lookback_months not in self.lookbacks_months.value:
-                problems.append(f"{claim.id}: lookback_months is not in lookbacks_months")
-            if claim.top_n not in self.top_n.value:
-                problems.append(f"{claim.id}: top_n is not in top_n")
+            if claim.subject is Subject.STRATEGY:
+                if claim.lookback_months not in self.lookbacks_months.value:
+                    problems.append(f"{claim.id}: lookback_months is not in lookbacks_months")
+                if claim.top_n not in self.top_n.value:
+                    problems.append(f"{claim.id}: top_n is not in top_n")
             if claim.period_start < start or claim.period_end > end:
                 problems.append(f"{claim.id}: period lies outside the sample")
         if problems:
@@ -157,13 +205,19 @@ def load_spec(path: Path) -> StrategySpec:
     return StrategySpec.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
-def provenance_counts(spec: StrategySpec) -> dict[Provenance, int]:
-    """Count the sources of all cited fields and all claims, by provenance."""
-    counts = dict.fromkeys(Provenance, 0)
+def sources(spec: StrategySpec) -> Iterator[tuple[str, Source]]:
+    """Every source in the spec, labelled by field name or claim id, in file order."""
     for name in type(spec).model_fields:
         field = getattr(spec, name)
         if isinstance(field, Cited):
-            counts[field.source.kind] += 1
+            yield name, field.source
     for claim in spec.claims:
-        counts[claim.source.kind] += 1
+        yield claim.id, claim.source
+
+
+def provenance_counts(spec: StrategySpec) -> dict[Provenance, int]:
+    """Count the sources of all cited fields and all claims, by provenance."""
+    counts = dict.fromkeys(Provenance, 0)
+    for _, source in sources(spec):
+        counts[source.kind] += 1
     return counts

@@ -22,6 +22,17 @@ paper:
   # Compute with: shasum -a 256 papers/<file>.pdf
   pdf_sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
+# How this spec was extracted, by whom, and whether a human has checked it against the paper.
+extraction:
+  # "hand" or "ai-drafted, human-verified".
+  method: "hand"
+  # Who (or which tool and model) wrote the first draft.
+  drafted_by: "C. Extractor"
+  # Who checked every field against the PDF. null until that is done; validate-spec then says "unverified".
+  verified_by: "D. Checker"
+  # Date of the extraction, YYYY-MM-DD.
+  date: "2000-02-01"
+
 # The set of securities the strategy chooses from. Cite the page that defines it.
 universe:
   value: "All common stocks listed on the Example Exchange"
@@ -125,9 +136,13 @@ signal_lag_months:
     quote: "We skip one month between the formation period and the holding period."
 
 # Headline numbers the replication will be checked against. Ids are C1, C2, ...
-# lookback_months and top_n must appear in the lists above; the period must lie inside the sample.
+# A claim is about the strategy or about the benchmark (`subject`). Strategy claims give
+# lookback_months and top_n, which must appear in the lists above; benchmark claims set both to null.
+# The period must lie inside the sample.
 claims:
   - id: "C1"
+    # "strategy" or "benchmark".
+    subject: "strategy"
     # The claim in the paper's own terms.
     statement: "The 12-month top-10 portfolio earns 1.1 percent per month."
     # What is measured: mean_monthly_return, sharpe_ratio, ...
@@ -146,3 +161,18 @@ claims:
       page: 7
       section: "Table 1"
       quote: "Top-decile portfolio, 12-month formation: 1.10 percent per month."
+  - id: "C2"
+    subject: "benchmark"
+    statement: "The equal-weighted market portfolio earns 0.9 percent per month."
+    metric: "mean_monthly_return"
+    lookback_months: null
+    top_n: null
+    period_start: "1960-01"
+    period_end: "1990-12"
+    value: 0.9
+    unit: "percent_per_month"
+    source:
+      kind: stated
+      page: 7
+      section: "Table 1"
+      quote: "The equal-weighted market portfolio earns 0.90 percent per month."

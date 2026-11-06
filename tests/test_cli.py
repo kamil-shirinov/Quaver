@@ -1,5 +1,5 @@
-import copy
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -7,6 +7,18 @@ import yaml
 from quaver.cli import main
 
 TEMPLATE = Path(__file__).parent.parent / "specs" / "TEMPLATE.yaml"
+FIXTURE = Path(__file__).parent / "fixtures" / "example-paper.txt"
+
+
+def write_spec(tmp_path: Path, data: dict[str, Any]) -> Path:
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return path
+
+
+def template_data() -> dict[str, Any]:
+    data: dict[str, Any] = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
+    return data
 
 
 def test_validate_spec_success(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
@@ -15,19 +27,25 @@ def test_validate_spec_success(capsys: pytest.CaptureFixture[str], tmp_path: Pat
     assert main(["validate-spec", str(path)]) == 0
     out = capsys.readouterr().out
     assert out == (
-        "valid: Example Paper (2000), 1 claim, sources: 10 stated, 2 inferred, 2 assumed\n"
+        "valid: Example Paper (2000), 2 claims, sources: 11 stated, 2 inferred, 2 assumed\n"
     )
 
 
-def test_validate_spec_plural_claims(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
-    data = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
-    second = copy.deepcopy(data["claims"][0])
-    second["id"] = "C2"
-    data["claims"].append(second)
-    path = tmp_path / "spec.yaml"
-    path.write_text(yaml.safe_dump(data), encoding="utf-8")
-    assert main(["validate-spec", str(path)]) == 0
-    assert "), 2 claims, sources:" in capsys.readouterr().out
+def test_validate_spec_single_claim(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    data = template_data()
+    data["claims"] = data["claims"][:1]
+    assert main(["validate-spec", str(write_spec(tmp_path, data))]) == 0
+    assert "), 1 claim, sources:" in capsys.readouterr().out
+
+
+def test_validate_spec_unverified(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    data = template_data()
+    data["extraction"]["verified_by"] = None
+    assert main(["validate-spec", str(write_spec(tmp_path, data))]) == 0
+    assert capsys.readouterr().out == (
+        "valid: Example Paper (2000), 2 claims, sources: 11 stated, 2 inferred, 2 assumed, "
+        "unverified\n"
+    )
 
 
 def test_validate_spec_invalid_content(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
@@ -67,3 +85,73 @@ def test_no_subcommand_is_a_usage_error() -> None:
     with pytest.raises(SystemExit) as info:
         main([])
     assert info.value.code == 2
+
+
+# --- check-quotes ---------------------------------------------------------------------------
+
+
+def test_check_quotes_template_passes(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["check-quotes", str(TEMPLATE), str(FIXTURE)]) == 0
+    assert capsys.readouterr().out == "all 11 quotes found\n"
+
+
+def test_check_quotes_reports_each_failure(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    data = template_data()
+    data["universe"]["source"]["page"] = 4  # right quote, wrong page
+    data["claims"][1]["source"]["quote"] = "earns 0.9 percent per month."  # not verbatim
+    assert main(["check-quotes", str(write_spec(tmp_path, data)), str(FIXTURE)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == (
+        "not found: universe, page 4: "
+        "'We use all common stocks listed on the Example Exchange.'\n"
+        "not found: C2, page 7: 'earns 0.9 percent per month.'\n"
+    )
+    assert captured.err == "2 of 11 quotes not found\n"
+
+
+def test_check_quotes_quote_without_page(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    data = template_data()
+    data["costs"]["source"]["quote"] = "Each portfolio is equally weighted."
+    assert main(["check-quotes", str(write_spec(tmp_path, data)), str(FIXTURE)]) == 1
+    assert "not found: costs, no page: 'Each portfolio is equally weighted.'" in (
+        capsys.readouterr().out
+    )
+
+
+def test_check_quotes_page_missing_from_text(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    data = template_data()
+    data["weighting"]["source"]["page"] = 99
+    assert main(["check-quotes", str(write_spec(tmp_path, data)), str(FIXTURE)]) == 1
+    assert "not found: weighting, page 99:" in capsys.readouterr().out
+
+
+def test_check_quotes_invalid_spec(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    path = tmp_path / "spec.yaml"
+    path.write_text("- a\n", encoding="utf-8")
+    assert main(["check-quotes", str(path), str(FIXTURE)]) == 1
+    assert f"invalid: {path}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (None, "No such file"),
+        ("no markers here\n", "no '=== page N ===' markers found"),
+    ],
+)
+def test_check_quotes_bad_text(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, content: str | None, message: str
+) -> None:
+    text = tmp_path / "paper.txt"
+    if content is not None:
+        text.write_text(content, encoding="utf-8")
+    assert main(["check-quotes", str(TEMPLATE), str(text)]) == 1
+    err = capsys.readouterr().err
+    assert f"invalid: {text}" in err
+    assert message in err

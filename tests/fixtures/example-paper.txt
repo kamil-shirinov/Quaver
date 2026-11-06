@@ -1,0 +1,28 @@
+=== page 1 ===
+Example Paper
+A. Author and B. Writer
+January 2000
+=== page 2 ===
+INTRODUCTION
+Momentum is a made-up subject for this made-up paper.
+=== page 3 ===
+DATA
+We use all common stocks listed on the
+Example Exchange.  Returns are ta-
+  ken from the Example Price Database.
+Our sample begins in January 1960. It covers every listed firm
+and ends in December 1990.
+=== page 4 ===
+METHOD
+Stocks are ranked on their cumulative return over the forma-
+tion period. We consider formation periods of 6 and 12 months.
+We skip one month between the formation period and the holding period.
+=== page 5 ===
+Each portfolio is equally weighted.
+=== page 6 ===
+We compare each strategy with the equal-
+weighted market portfolio.
+=== page 7 ===
+Table 1
+Top-decile portfolio, 12-month formation: 1.10 percent per month.
+The equal-weighted market portfolio earns 0.90 percent per month.

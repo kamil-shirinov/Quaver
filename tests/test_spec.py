@@ -1,4 +1,5 @@
 import copy
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -6,7 +7,19 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from quaver.spec import Claim, Paper, Provenance, Source, StrategySpec, load_spec, provenance_counts
+from quaver.spec import (
+    Claim,
+    Extraction,
+    ExtractionMethod,
+    Paper,
+    Provenance,
+    Source,
+    StrategySpec,
+    Subject,
+    load_spec,
+    provenance_counts,
+    sources,
+)
 
 TEMPLATE = Path(__file__).parent.parent / "specs" / "TEMPLATE.yaml"
 
@@ -109,6 +122,144 @@ def test_claim_id_invalid(claim_id: str) -> None:
         Claim.model_validate(claim_fields(id=claim_id))
 
 
+# --- Claim subject -------------------------------------------------------------------------
+
+
+def benchmark_fields(**overrides: Any) -> Data:
+    fields: Data = copy.deepcopy(template_data()["claims"][1])
+    fields.update(overrides)
+    return fields
+
+
+def test_benchmark_claim_valid() -> None:
+    claim = Claim.model_validate(benchmark_fields())
+    assert (claim.subject, claim.lookback_months, claim.top_n) == (Subject.BENCHMARK, None, None)
+
+
+def test_benchmark_claim_nulls_may_be_omitted() -> None:
+    fields = benchmark_fields()
+    del fields["lookback_months"], fields["top_n"]
+    assert Claim.model_validate(fields).top_n is None
+
+
+@pytest.mark.parametrize("overrides", [{"lookback_months": 12}, {"top_n": 10}])
+def test_benchmark_claim_rejects_strategy_parameters(overrides: Data) -> None:
+    with pytest.raises(ValidationError, match="benchmark claim must have null lookback_months"):
+        Claim.model_validate(benchmark_fields(**overrides))
+
+
+@pytest.mark.parametrize("missing", ["lookback_months", "top_n"])
+def test_strategy_claim_needs_parameters(missing: str) -> None:
+    with pytest.raises(ValidationError, match="strategy claim needs lookback_months and top_n"):
+        Claim.model_validate(claim_fields(**{missing: None}))
+    fields = claim_fields()
+    del fields[missing]
+    with pytest.raises(ValidationError, match="strategy claim needs lookback_months and top_n"):
+        Claim.model_validate(fields)
+
+
+@pytest.mark.parametrize("subject", ["Strategy", "index", "", None])
+def test_claim_subject_invalid(subject: Any) -> None:
+    with pytest.raises(ValidationError, match="subject"):
+        Claim.model_validate(claim_fields(subject=subject))
+
+
+def test_claim_subject_required() -> None:
+    fields = claim_fields()
+    del fields["subject"]
+    with pytest.raises(ValidationError, match="subject"):
+        Claim.model_validate(fields)
+
+
+def test_benchmark_claim_skips_parameter_lists() -> None:
+    # Benchmark claims have no lookback or top_n to check against the spec's lists.
+    data = template_data()
+    data["lookbacks_months"]["value"] = [3]
+    data["top_n"]["value"] = [5]
+    data["claims"] = [data["claims"][1]]
+    assert StrategySpec.model_validate(data).claims[0].subject is Subject.BENCHMARK
+
+
+def test_benchmark_claim_period_inside_sample() -> None:
+    data = template_data()
+    data["claims"][1].update(period_start="1959-12")
+    with pytest.raises(ValidationError, match="C2: period lies outside the sample"):
+        StrategySpec.model_validate(data)
+
+
+# --- Extraction -----------------------------------------------------------------------------
+
+
+def extraction_fields(**overrides: Any) -> Data:
+    fields: Data = copy.deepcopy(template_data()["extraction"])
+    fields.update(overrides)
+    return fields
+
+
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    [("hand", ExtractionMethod.HAND), ("ai-drafted, human-verified", ExtractionMethod.AI_DRAFTED)],
+)
+def test_extraction_method_valid(method: str, expected: ExtractionMethod) -> None:
+    assert Extraction.model_validate(extraction_fields(method=method)).method is expected
+
+
+@pytest.mark.parametrize("method", ["Hand", "ai-drafted", "ai", ""])
+def test_extraction_method_invalid(method: str) -> None:
+    with pytest.raises(ValidationError, match="method"):
+        Extraction.model_validate(extraction_fields(method=method))
+
+
+def test_extraction_verified_by_may_be_null() -> None:
+    assert Extraction.model_validate(extraction_fields(verified_by=None)).verified_by is None
+
+
+@pytest.mark.parametrize("field", ["method", "drafted_by", "verified_by", "date"])
+def test_extraction_fields_required(field: str) -> None:
+    fields = extraction_fields()
+    del fields[field]
+    with pytest.raises(ValidationError, match=field):
+        Extraction.model_validate(fields)
+
+
+def test_extraction_required() -> None:
+    data = template_data()
+    del data["extraction"]
+    with pytest.raises(ValidationError, match="extraction"):
+        StrategySpec.model_validate(data)
+
+
+@pytest.mark.parametrize("value", ["2026-11-06", date(2026, 11, 6)])
+def test_extraction_date_valid(value: Any) -> None:
+    assert Extraction.model_validate(extraction_fields(date=value)).date == date(2026, 11, 6)
+
+
+def test_extraction_date_unquoted_yaml() -> None:
+    fields = yaml.safe_load("method: hand\ndrafted_by: x\nverified_by: null\ndate: 2026-11-06\n")
+    assert Extraction.model_validate(fields).date == date(2026, 11, 6)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-11",
+        "2026-11-6",
+        "2026/11/06",
+        "06-11-2026",
+        "2026-02-30",
+        "2026-13-01",
+        "20261106",
+        " 2026-11-06",
+        datetime(2026, 11, 6, 12, 0),
+        20261106,
+        None,
+    ],
+)
+def test_extraction_date_invalid(value: Any) -> None:
+    with pytest.raises(ValidationError, match="is not a YYYY-MM-DD date"):
+        Extraction.model_validate(extraction_fields(date=value))
+
+
 # --- YYYY-MM everywhere ---------------------------------------------------------------------
 
 
@@ -153,14 +304,16 @@ def test_template_loads() -> None:
     spec = load_spec(TEMPLATE)
     assert spec.paper.title == "Example Paper"
     assert spec.paper.year == 2000
-    assert len(spec.claims) == 1
+    assert [claim.subject for claim in spec.claims] == [Subject.STRATEGY, Subject.BENCHMARK]
+    assert spec.extraction.method is ExtractionMethod.HAND
 
 
 def test_sample_start_before_end() -> None:
     data = template_data()
     data["sample_start"]["value"] = "1989-12"
     data["sample_end"]["value"] = "1990-01"
-    data["claims"][0].update(period_start="1989-12", period_end="1990-01")
+    for claim in data["claims"]:
+        claim.update(period_start="1989-12", period_end="1990-01")
     StrategySpec.model_validate(data)
 
 
@@ -202,11 +355,11 @@ def test_int_lists_invalid(field: str, values: list[int], message: str) -> None:
 
 def test_claim_ids_unique() -> None:
     data = template_data()
-    second = copy.deepcopy(data["claims"][0])
-    second["id"] = "C2"
-    data["claims"].append(second)
-    assert len(StrategySpec.model_validate(data).claims) == 2
-    second["id"] = "C1"
+    third = copy.deepcopy(data["claims"][0])
+    third["id"] = "C3"
+    data["claims"].append(third)
+    assert len(StrategySpec.model_validate(data).claims) == 3
+    third["id"] = "C1"
     with pytest.raises(ValidationError, match="claim ids must be unique"):
         StrategySpec.model_validate(data)
 
@@ -267,7 +420,7 @@ def test_load_spec_rejects_non_mapping(tmp_path: Path) -> None:
 
 def test_provenance_counts_template() -> None:
     counts = provenance_counts(load_spec(TEMPLATE))
-    assert counts == {Provenance.STATED: 10, Provenance.INFERRED: 2, Provenance.ASSUMED: 2}
+    assert counts == {Provenance.STATED: 11, Provenance.INFERRED: 2, Provenance.ASSUMED: 2}
 
 
 def test_provenance_counts_includes_zero_entries() -> None:
@@ -278,3 +431,10 @@ def test_provenance_counts_includes_zero_entries() -> None:
             field["source"] = {"kind": "assumed", "reason": "r"}
     counts = provenance_counts(StrategySpec.model_validate(data))
     assert counts == {Provenance.STATED: 0, Provenance.INFERRED: 0, Provenance.ASSUMED: 13}
+
+
+def test_sources_labels_fields_and_claims_in_order() -> None:
+    labels = [where for where, _ in sources(load_spec(TEMPLATE))]
+    assert labels[0] == "universe"
+    assert labels[-3:] == ["signal_lag_months", "C1", "C2"]
+    assert len(labels) == 15

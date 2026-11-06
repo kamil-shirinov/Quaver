@@ -10,6 +10,9 @@ dependencies = [
     "pyyaml",
 ]
 
+[project.scripts]
+quaver = "quaver.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest",
@@ -35,6 +38,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.mypy]
 strict = true
+plugins = ["pydantic.mypy"]
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]

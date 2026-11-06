@@ -1,0 +1,148 @@
+# QuaVer strategy spec template. Every value below is made up.
+#
+# Every value carries a `source` saying where it came from:
+#   stated   - the paper says it. Give `page` (>= 1) and `quote` (at most 25 words, verbatim).
+#   inferred - the paper implies it. Give `page` and `reason` (how you got from the page to the value).
+#   assumed  - the paper does not say. Give `reason` only; `page` must be left out.
+# `section` is optional on any source. Page numbers refer to the PDF identified by pdf_sha256.
+# Quote strings that could be read as numbers or dates (hashes, YYYY-MM) so YAML keeps them as text.
+
+paper:
+  # Full title exactly as printed on the paper.
+  title: "Example Paper"
+  # One entry per author, as printed.
+  authors: ["A. Author", "B. Writer"]
+  # Year of publication.
+  year: 2000
+  # Where the paper was obtained (stable link, not a search result).
+  url: "https://example.com/example-paper.pdf"
+  # The draft date printed on the paper, so a later revision is not mistaken for this one.
+  version: "January 2000"
+  # SHA-256 of the exact PDF the page numbers refer to: 64 lowercase hex characters.
+  # Compute with: shasum -a 256 papers/<file>.pdf
+  pdf_sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# The set of securities the strategy chooses from. Cite the page that defines it.
+universe:
+  value: "All common stocks listed on the Example Exchange"
+  source:
+    kind: stated
+    page: 3
+    section: "Data"
+    quote: "We use all common stocks listed on the Example Exchange."
+
+# Where the paper's price/return data comes from (vendor or database name).
+data_source:
+  value: "Example Price Database"
+  source:
+    kind: stated
+    page: 3
+    quote: "Returns are taken from the Example Price Database."
+
+# How often the strategy is observed and traded: monthly, daily, ...
+frequency:
+  value: "monthly"
+  source:
+    kind: inferred
+    page: 4
+    reason: "All tables report monthly returns, so portfolios are formed monthly."
+
+# The ranking variable used to pick securities, in words precise enough to code.
+signal:
+  value: "Cumulative return over the lookback window, skipping the most recent month"
+  source:
+    kind: stated
+    page: 4
+    quote: "Stocks are ranked on their cumulative return over the formation period."
+
+# How portfolio weights are set: equal weight, value weight, ...
+weighting:
+  value: "equal weight"
+  source:
+    kind: stated
+    page: 5
+    quote: "Each portfolio is equally weighted."
+
+# When and how the portfolio is rebuilt: monthly, quarterly, overlapping holdings, ...
+rebalance:
+  value: "monthly"
+  source:
+    kind: inferred
+    page: 5
+    reason: "A new portfolio is formed each month and held for one month."
+
+# Transaction costs applied to reported results. If the paper is silent, assume and say so.
+costs:
+  value: "none"
+  source:
+    kind: assumed
+    reason: "The paper reports gross returns and never mentions trading costs."
+
+# The comparison portfolio or index the paper measures against.
+benchmark:
+  value: "Equal-weighted market portfolio"
+  source:
+    kind: stated
+    page: 6
+    quote: "We compare each strategy with the equal-weighted market portfolio."
+
+# First and last month of the paper's sample, as YYYY-MM. Start must be before end.
+sample_start:
+  value: "1960-01"
+  source:
+    kind: stated
+    page: 3
+    quote: "Our sample begins in January 1960."
+
+sample_end:
+  value: "1990-12"
+  source:
+    kind: stated
+    page: 3
+    quote: "and ends in December 1990."
+
+# Lookback windows in months: positive, unique, sorted ascending.
+lookbacks_months:
+  value: [6, 12]
+  source:
+    kind: stated
+    page: 4
+    quote: "We consider formation periods of 6 and 12 months."
+
+# Number of securities held in the top portfolio: positive, unique, sorted ascending.
+top_n:
+  value: [10, 20]
+  source:
+    kind: assumed
+    reason: "The paper uses deciles; with this made-up universe a decile is about 10 to 20 names."
+
+# Months between the end of the signal window and the trade (0 = trade at once).
+signal_lag_months:
+  value: 1
+  source:
+    kind: stated
+    page: 4
+    quote: "We skip one month between the formation period and the holding period."
+
+# Headline numbers the replication will be checked against. Ids are C1, C2, ...
+# lookback_months and top_n must appear in the lists above; the period must lie inside the sample.
+claims:
+  - id: "C1"
+    # The claim in the paper's own terms.
+    statement: "The 12-month top-10 portfolio earns 1.1 percent per month."
+    # What is measured: mean_monthly_return, sharpe_ratio, ...
+    metric: "mean_monthly_return"
+    lookback_months: 12
+    top_n: 10
+    # Period the number covers, YYYY-MM.
+    period_start: "1960-01"
+    period_end: "1990-12"
+    # The number as printed, and its unit (percent_per_month, ratio, ...).
+    value: 1.1
+    unit: "percent_per_month"
+    # Where the number appears: the table or sentence on a page.
+    source:
+      kind: stated
+      page: 7
+      section: "Table 1"
+      quote: "Top-decile portfolio, 12-month formation: 1.10 percent per month."

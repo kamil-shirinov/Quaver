@@ -1,0 +1,56 @@
+from pathlib import Path
+
+import pytest
+
+from quaver.cli import main
+
+TEMPLATE = Path(__file__).parent.parent / "specs" / "TEMPLATE.yaml"
+
+
+def test_validate_spec_success(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    path = tmp_path / "spec.yaml"
+    path.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    assert main(["validate-spec", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert out == (
+        "valid: Example Paper (2000), 1 claims, sources: 10 stated, 2 inferred, 2 assumed\n"
+    )
+
+
+def test_validate_spec_invalid_content(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    path = tmp_path / "spec.yaml"
+    text = TEMPLATE.read_text(encoding="utf-8").replace('value: "1960-01"', 'value: "1960-13"')
+    path.write_text(text, encoding="utf-8")
+    assert main(["validate-spec", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"invalid: {path}" in captured.err
+    assert "sample_start.value: Value error, '1960-13' is not a YYYY-MM month" in captured.err
+
+
+def test_validate_spec_root_not_a_mapping(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    path = tmp_path / "spec.yaml"
+    path.write_text("- a\n- b\n", encoding="utf-8")
+    assert main(["validate-spec", str(path)]) == 1
+    assert "<root>" in capsys.readouterr().err
+
+
+def test_validate_spec_missing_file(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    path = tmp_path / "missing.yaml"
+    assert main(["validate-spec", str(path)]) == 1
+    assert "No such file" in capsys.readouterr().err
+
+
+def test_validate_spec_broken_yaml(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    path = tmp_path / "spec.yaml"
+    path.write_text("key: [unclosed\n", encoding="utf-8")
+    assert main(["validate-spec", str(path)]) == 1
+    assert "invalid:" in capsys.readouterr().err
+
+
+def test_no_subcommand_is_a_usage_error() -> None:
+    with pytest.raises(SystemExit) as info:
+        main([])
+    assert info.value.code == 2

@@ -341,6 +341,13 @@ def test_reproduced(tmp_path: Path, data: French10) -> None:
         "spec": head,
         "code": head,
     }
+    assert result["preregistration_files"] == {
+        name: {
+            "sha256": hashlib.sha256((repo / name).read_bytes()).hexdigest(),
+            "commit": head,
+        }
+        for name in (AMENDMENT_01, PREREG)
+    }
     assert result["data"]["csv_sha256"] == PIN["french_10_industries"]["csv_sha256"]
     assert result["data"]["pinned_csv_sha256"] == PIN["french_10_industries"]["csv_sha256"]
     assert result["data"]["zip_sha256"] == "0" * 64
@@ -351,6 +358,9 @@ def test_reproduced(tmp_path: Path, data: French10) -> None:
         "# Test 1 (reproduce): Example Paper (2000)\n\n**Verdict: reproduced.**"
     )
     assert " ✗**" not in report  # no marked cell
+    sha = result["preregistration_files"][PREREG]["sha256"]
+    assert "- Locked pre-registration files:\n  - `prereg/" in report
+    assert f"  - `{PREREG}`: commit `{head}`, SHA-256 `{sha}`" in report
 
 
 def test_each_claim_uses_its_own_version(tmp_path: Path, data: French10) -> None:

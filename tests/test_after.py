@@ -246,3 +246,48 @@ def test_ratio_is_none_when_the_in_sample_statistic_is_zero() -> None:
     assert after.family_statistic(data, "2000-01", "2002-12") == 0.0
     details = after.after_publication(data, "2003-01", "2004-12", "2000-01", "2002-12")
     assert details["ratio_after_to_in_sample"] is None
+
+
+# --- Complete years only (amendment 02, point 2) ------------------------------------------------
+
+
+def without_verdict(result: after.Test2) -> dict[str, object]:
+    figure = result.to_json()
+    del figure["verdict"]
+    return figure
+
+
+def test_complete_years_figure_drops_a_partial_last_year() -> None:
+    data = made_up(n=72, start=1999)  # 1999-01 to 2004-12
+    figure = after.complete_years_figure(data, "2003-01", "2004-09")
+    assert figure == without_verdict(after.test2(data, "2003-01", "2003-12"))
+    assert figure is not None
+    assert "verdict" not in figure
+    assert (figure["first"], figure["last"], figure["months"]) == ("2003-01", "2003-12", 12)
+
+
+def test_complete_years_figure_drops_a_partial_first_year() -> None:
+    data = made_up(n=72, start=1999)
+    figure = after.complete_years_figure(data, "2002-04", "2004-12")
+    assert figure == without_verdict(after.test2(data, "2003-01", "2004-12"))
+
+
+def test_complete_years_figure_of_complete_years_is_test2_without_a_verdict() -> None:
+    data = made_up(n=72, start=1999)
+    figure = after.complete_years_figure(data, "2002-01", "2004-12")
+    assert figure == without_verdict(after.test2(data, "2002-01", "2004-12"))
+
+
+def test_complete_years_figure_without_a_complete_year() -> None:
+    data = made_up(n=72, start=1999)
+    assert after.complete_years_figure(data, "2003-02", "2003-11") is None
+
+
+def test_after_publication_reports_the_complete_years_figure() -> None:
+    data = made_up(n=72, start=1999)
+    details = after.after_publication(data, "2003-01", "2004-09", "2000-01", "2002-12")
+    assert details["complete_years"] == after.complete_years_figure(data, "2003-01", "2004-09")
+    assert details["complete_years"]["last"] == "2003-12"
+    # The main test still uses every month, the partial year included (amendment 02, point 1).
+    assert details["test2"]["last"] == "2004-09"
+    assert details["test2"]["months"] == 21

@@ -191,6 +191,23 @@ def describe(returns: FloatArray, months: tuple[str, ...], benchmark: FloatArray
     }
 
 
+def complete_years_figure(data: French10, first: str, last: str) -> dict[str, Any] | None:
+    """Amendment 02, point 2: Test 2's statistic over complete calendar years only, no verdict.
+
+    The holding months ``first`` to ``last`` with any partial year dropped. A partial year can
+    only fall at either end of the span, so the complete years are one unbroken run of months.
+    None if there is no complete year.
+    """
+    start, stop = data.months.index(first), data.months.index(last)
+    span = data.months[start : stop + 1]
+    complete, _ = split_years(span)
+    if not complete:
+        return None
+    figure = test2(data, span[complete[0]], span[complete[-1]]).to_json()
+    del figure["verdict"]
+    return figure
+
+
 def after_publication(
     data: French10, first: str, last: str, in_first: str, in_last: str
 ) -> dict[str, Any]:
@@ -211,6 +228,7 @@ def after_publication(
         "test2": after.to_json(),
         "in_sample": {"first": in_first, "last": in_last, "estimate": in_sample},
         "ratio_after_to_in_sample": after.estimate / in_sample if in_sample != 0.0 else None,
+        "complete_years": complete_years_figure(data, first, last),
         "family": describe(family_returns(data, first, last), months, bench),
         "benchmark": describe(bench, months, bench),
         "versions": versions,

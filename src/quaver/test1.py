@@ -23,7 +23,7 @@ from pydantic import ValidationError
 from quaver import metrics
 from quaver.data import DataError, French10, load_french10, sha256_of
 from quaver.faber import FloatArray, Weights, benchmark_returns, version_returns
-from quaver.prereg import lock_problems
+from quaver.prereg import lock_problems, read_locks
 from quaver.spec import Claim, StrategySpec, Subject, load_spec
 
 PREREG = "prereg/0001-faber-2010.md"
@@ -179,6 +179,29 @@ def _commit_of(root: Path, path: str) -> str:
     return commit
 
 
+def prereg_files(root: Path) -> dict[str, dict[str, str]]:
+    """Every file in prereg/LOCKS.sha256: its pinned SHA-256 and the last commit to change it.
+
+    Section 8: "Every result file records the commit hash of this file." Recording every locked
+    file means each amendment is recorded too, including ones added after a runner was written.
+    """
+    return {
+        f"{PREREG_DIR}/{name}": {
+            "sha256": digest,
+            "commit": _commit_of(root, f"{PREREG_DIR}/{name}"),
+        }
+        for name, digest in read_locks(root / PREREG_DIR).items()
+    }
+
+
+def prereg_lines(files: dict[str, dict[str, str]]) -> list[str]:
+    """Report lines naming every locked pre-registration file, its commit and its SHA-256."""
+    return [
+        f"- `{path}`: commit `{pinned['commit']}`, SHA-256 `{pinned['sha256']}`"
+        for path, pinned in files.items()
+    ]
+
+
 def _load_checked_spec(path: Path) -> StrategySpec:
     try:
         spec = load_spec(path)
@@ -317,6 +340,7 @@ def run_test1(root: Path, rerun: str | None = None) -> Outcome:
         "spec": _commit_of(root, SPEC),
         "code": _git(root, "rev-parse", "HEAD").strip(),
     }
+    locked = prereg_files(root)
     try:
         data = load_french10(root / CSV, root / PINS)
     except (OSError, DataError) as error:
@@ -370,6 +394,7 @@ def run_test1(root: Path, rerun: str | None = None) -> Outcome:
         "top_n": spec.top_n.value,
         "tolerances": TOLERANCES,
         "commits": commits,
+        "preregistration_files": locked,
         "data": {
             "csv": CSV,
             "csv_sha256": sha256_of(root / CSV),
@@ -553,6 +578,8 @@ def render_report(result: dict[str, Any]) -> str:
         f"`{data['pinned_csv_sha256']}`), zip SHA-256 `{data['zip_sha256']}`, "
         f"downloaded {data['downloaded']}",
         f"- Run at (UTC): {result['run_at_utc']}",
+        "- Locked pre-registration files:",
+        *(f"  {line}" for line in prereg_lines(result["preregistration_files"])),
         "",
     ]
     return "\n".join(lines)

@@ -34,6 +34,8 @@ from quaver.test1 import (
     _commit_of,
     _git,
     _next_index,
+    prereg_files,
+    prereg_lines,
 )
 
 # Section 2: "After publication: 2010-01 to END." Section 1: "END is the last month in that
@@ -58,6 +60,7 @@ class Outcome:
 @dataclass(frozen=True)
 class _Ready:
     commits: dict[str, str]
+    prereg_files: dict[str, dict[str, str]]
     data: French10
     provenance: dict[str, Any]
     end_month: str
@@ -90,6 +93,7 @@ def _prepare(root: Path, rerun: str | None, out_dir: str, required: str, before:
         "spec": _commit_of(root, SPEC),
         "code": _git(root, "rev-parse", "HEAD").strip(),
     }
+    locked = prereg_files(root)
     try:
         data = load_french10(root / CSV, root / PINS)
     except (OSError, DataError) as error:
@@ -103,7 +107,7 @@ def _prepare(root: Path, rerun: str | None, out_dir: str, required: str, before:
         "downloaded": pins.get("downloaded"),
         "end_month": pins.get("end_month"),
     }
-    return _Ready(commits, data, provenance, str(pins.get("end_month")))
+    return _Ready(commits, locked, data, provenance, str(pins.get("end_month")))
 
 
 def _through(data: French10, last: str) -> French10:
@@ -142,6 +146,7 @@ def _common(
     return {
         "seed": luck.SEED,
         "commits": ready.commits,
+        "preregistration_files": ready.prereg_files,
         "data": ready.provenance,
         "rerun": None if rerun is None else {"reason": rerun, "previous": previous},
         "run_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -259,6 +264,8 @@ def _provenance(result: dict[str, Any]) -> list[str]:
         f"- Random families: k = {result['k']:,}, numpy.random.default_rng({result['seed']}), "
         f"drawn in chunks of {luck.CHUNK}",
         f"- Run at (UTC): {result['run_at_utc']}, runtime {result['runtime_seconds']:.1f} s",
+        "- Locked pre-registration files:",
+        *(f"  {line}" for line in prereg_lines(result["preregistration_files"])),
     ]
     if result["rerun"] is not None:
         previous = result["rerun"]["previous"] or "none"
@@ -298,6 +305,17 @@ def _partial(described: dict[str, Any]) -> str:
     )
 
 
+def _complete_years_line(figure: dict[str, Any] | None) -> str:
+    if figure is None:
+        return "- Complete years only (amendment 02, point 2): — (no complete calendar year)"
+    return (
+        f"- Complete years only, {figure['first']} to {figure['last']} ({figure['months']} "
+        f"months; amendment 02, point 2): {_pp(figure['estimate'])} pp per year, Newey-West "
+        f"standard error ({figure['lags']} lags) {100.0 * figure['standard_error']:.2f} pp, "
+        f"z = {figure['z']:.3f}, one-sided p = {figure['p']:.4f}"
+    )
+
+
 def render_after(result: dict[str, Any]) -> str:
     """REPORT.md for the after-publication run: both verdicts, then every number behind them."""
     t2, t3 = result["test2"], result["test3"]
@@ -325,6 +343,7 @@ def render_after(result: dict[str, Any]) -> str:
         "",
         "Reported without a verdict:",
         "",
+        _complete_years_line(result["complete_years"]),
         f"- In-sample ({result['in_sample']['first']} to {result['in_sample']['last']}): "
         f"{_pp(result['in_sample']['estimate'])} pp per year",
         "- After publication / in-sample: "

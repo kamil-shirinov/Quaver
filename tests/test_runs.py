@@ -24,6 +24,7 @@ from quaver.runs import (
     TEST3_IN_DIR,
     TEST3_IN_RESULT,
     histogram,
+    render_after,
     run_after,
     run_test3_in,
 )
@@ -145,6 +146,27 @@ def make_repo(
     return repo
 
 
+def locked(repo: Path, commit: str, *names: str) -> dict[str, dict[str, str]]:
+    return {
+        f"prereg/{name}": {
+            "sha256": hashlib.sha256((repo / "prereg" / name).read_bytes()).hexdigest(),
+            "commit": commit,
+        }
+        for name in names
+    }
+
+
+AMENDMENT_02 = "prereg/0001-faber-2010-amendment-02.md"
+
+
+def add_amendment_02(repo: Path) -> str:
+    """A made-up second amendment, locked and committed on its own; returns its commit."""
+    (repo / AMENDMENT_02).write_text("# Made-up amendment 02\n", encoding="utf-8")
+    write_locks(repo / "prereg")
+    commit_all(repo, "Amendment 02")
+    return git(repo, "rev-parse", "HEAD").strip()
+
+
 def result_of(repo: Path, out_dir: str, name: str = "result.json") -> dict[str, Any]:
     loaded: dict[str, Any] = json.loads((repo / out_dir / name).read_text(encoding="utf-8"))
     return loaded
@@ -183,6 +205,9 @@ def test_test3_in(tmp_path: Path) -> None:
         "spec": head,
         "code": head,
     }
+    assert result["preregistration_files"] == locked(
+        repo, head, "0001-faber-2010-amendment-01.md", "0001-faber-2010.md"
+    )
     digest = hashlib.sha256(CSV_BYTES).hexdigest()
     assert result["data"]["csv_sha256"] == result["data"]["pinned_csv_sha256"] == digest
     assert result["data"]["zip_sha256"] == "0" * 64
@@ -200,6 +225,9 @@ def test_test3_in(tmp_path: Path) -> None:
     assert verdict_at < statistic_at < histogram_at
     assert report.count("<-- real") == 1
     assert f"k = {K}, numpy.random.default_rng(20261106)" in report
+    assert "- Locked pre-registration files:\n" in report
+    sha = result["preregistration_files"][PREREG]["sha256"]
+    assert f"  - `{PREREG}`: commit `{head}`, SHA-256 `{sha}`" in report
 
 
 def test_test3_in_draws_match_the_luck_module(tmp_path: Path) -> None:
@@ -267,6 +295,52 @@ def test_after(tmp_path: Path) -> None:
     assert "Partial year, reported separately" in report
     assert "2011-01 to 2011-09" in report
     assert "McLean and Pontiff (2016)" in report
+    # Amendment 02, point 2: complete years only, reported without a verdict.
+    figure = result["complete_years"]
+    assert figure == after.complete_years_figure(data, "2010-01", END)
+    assert (figure["first"], figure["last"], figure["months"]) == ("2010-01", "2010-12", 12)
+    assert "verdict" not in figure
+    assert (
+        f"- Complete years only, 2010-01 to 2010-12 (12 months; amendment 02, point 2): "
+        f"{100.0 * figure['estimate']:+.2f} pp per year, Newey-West standard error "
+        f"({figure['lags']} lags) {100.0 * figure['standard_error']:.2f} pp, "
+        f"z = {figure['z']:.3f}, one-sided p = {figure['p']:.4f}\n"
+    ) in report
+    assert report.index("Reported without a verdict:") < report.index("Complete years only")
+    assert report.index("Complete years only") < report.index("## Test 3")
+
+
+def test_after_report_without_a_complete_year(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path, test3_in=True)
+    run_after(repo)
+    result = result_of(repo, AFTER_DIR) | {"complete_years": None}
+    assert (
+        "- Complete years only (amendment 02, point 2): — (no complete calendar year)\n"
+        in render_after(result)
+    )
+
+
+@pytest.mark.parametrize(
+    ("runner", "out_dir"),
+    [
+        pytest.param(run_test3_in, TEST3_IN_DIR, id="test3-in"),
+        pytest.param(run_after, AFTER_DIR, id="after"),
+    ],
+)
+def test_every_locked_prereg_file_is_recorded(tmp_path: Path, runner: Any, out_dir: str) -> None:
+    repo = make_repo(tmp_path, test3_in=out_dir == AFTER_DIR)
+    setup = git(repo, "rev-parse", "HEAD").strip()
+    amended = add_amendment_02(repo)
+    runner(repo)
+    result = result_of(repo, out_dir)
+    assert result["preregistration_files"] == {
+        **locked(repo, setup, "0001-faber-2010-amendment-01.md", "0001-faber-2010.md"),
+        **locked(repo, amended, "0001-faber-2010-amendment-02.md"),
+    }
+    # The older fields are kept as they were.
+    assert set(result["commits"]) == {"preregistration", "amendment_01", "spec", "code"}
+    sha = result["preregistration_files"][AMENDMENT_02]["sha256"]
+    assert f"  - `{AMENDMENT_02}`: commit `{amended}`, SHA-256 `{sha}`" in report_of(repo, out_dir)
 
 
 def test_after_refuses_an_end_other_than_the_pin(tmp_path: Path) -> None:

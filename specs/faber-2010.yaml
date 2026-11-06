@@ -1,0 +1,3088 @@
+# Quaver strategy spec for Faber (2010). AI-drafted, human-verified.
+#
+# Page numbers mean PDF page numbers counted from 1, matching the "=== page N ===" markers
+# in papers/faber-2010.txt, NOT the numbers printed on the pages.
+#
+# Every value carries a `source` saying where it came from:
+#   stated   - the paper says it. Give `page` (>= 1) and `quote` (at most 25 words, verbatim).
+#   inferred - the paper implies it. Give `page` and `reason` (how you got from the page to the value).
+#   assumed  - the paper does not say. Give `reason` only; `page` must be left out.
+#   table    - a value read off a table or chart image, which cannot be quoted. Give `page`,
+#              `section` (the exhibit name) and `locator` (row and column); `quote` must be null.
+#              `reason` is optional, for notes on the reading. check-quotes skips these.
+# `section` is optional on any source except table. Page numbers refer to the PDF identified by pdf_sha256.
+# Quote strings that could be read as numbers or dates (hashes, YYYY-MM) so YAML keeps them as text.
+#
+# Scope: the US equity sector strategy (Exhibits 3-4, 1928-2009). The global asset class study
+# (Exhibits 8-12, 1973-2009) uses a different universe and is left out, as are the dynamically
+# hedged portfolios (Exhibit 7).
+
+paper:
+  # Full title exactly as printed on the paper.
+  title: "Relative Strength Strategies for Investing"
+  # One entry per author, as printed.
+  authors: ["Mebane T. Faber"]
+  # Year of publication.
+  year: 2010
+  # Where the paper was obtained (stable link, not a search result).
+  url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1585517"
+  # The draft date printed on the paper, so a later revision is not mistaken for this one.
+  version: "First Draft April 2010"
+  # SHA-256 of the exact PDF the page numbers refer to: 64 lowercase hex characters.
+  # Compute with: shasum -a 256 papers/<file>.pdf
+  pdf_sha256: "9f06e6051e7eb76b5ddf8b8955f96562303b4308bfd7da400a56835a785fb12e"
+
+# How this spec was extracted, by whom, and whether a human has checked it against the paper.
+extraction:
+  method: "ai-drafted, human-verified"
+  drafted_by: "Claude Code (Opus 5.5)"
+  verified_by: "Kamil Shirinov"
+  date: "2026-11-06"
+
+# The set of securities the strategy chooses from. Cite the page that defines it.
+universe:
+  value: "Fama-French 10 Industry Portfolios, value-weighted series (US equity sectors)"
+  source:
+    kind: inferred
+    page: 3
+    section: "Data"
+    reason: >-
+      Joins two sentences on page 3: "we are using the 10 Industry Portfolios" and "We utilize
+      the value weighted groupings rather than the less realistic equal weighted portfolios".
+      No single quote of 25 words covers both.
+
+# Where the paper's price/return data comes from (vendor or database name).
+data_source:
+  value: "French-Fama CRSP Data Library"
+  source:
+    kind: stated
+    page: 3
+    section: "Data"
+    quote: "This research report utilizes the French-Fama CRSP Data Library since it has the longest history"
+
+# How often the strategy is observed and traded: monthly, daily, ...
+frequency:
+  value: "monthly"
+  source:
+    kind: stated
+    page: 7
+    quote: "The model is only updated once a month on the last day of the month."
+
+# The ranking variable used to pick securities, in words precise enough to code.
+signal:
+  value: "Trailing total return including dividends over the lookback window, ranked across the ten sectors"
+  source:
+    kind: stated
+    page: 6
+    section: "Ranking"
+    quote: "Each month the ten sectors are ranked on trailing total return including dividends."
+
+# How portfolio weights are set: equal weight, value weight, ...
+weighting:
+  value: "equal weight across the top N sectors (1/N each)"
+  source:
+    kind: inferred
+    page: 6
+    section: "Buy Rule"
+    reason: >-
+      Stated (page 6): the weights for Top 1 (100% in the top sector), Top 2 (50% in each of the
+      top two) and Top 3 (33% in each of the top three). Extrapolated: equal weights of 1/N for
+      Top 4 to Top 9, which the paper does not describe. Assumed: that weights are reset to 1/N
+      at every monthly rebalance. The paper says only that a sector falling out of the top X is
+      sold and replaced (Sell Rule); it does not say whether holdings that stay in the top X are
+      rebalanced back to equal weight or left to drift.
+
+# When and how the portfolio is rebuilt: monthly, quarterly, overlapping holdings, ...
+# NOTE: the value below is only what the quote says. That sectors staying in the top N are reset to
+# equal weight each month is NOT stated by the paper; it is assumed, and recorded in `weighting`.
+rebalance:
+  value: "monthly; a sector that falls out of the top N is sold at the monthly rebalance"
+  source:
+    kind: stated
+    page: 6
+    section: "Sell Rule"
+    quote: "if a sector falls out of the top X sectors it is sold at the monthly rebalance"
+
+# Transaction costs applied to reported results. If the paper is silent, assume and say so.
+costs:
+  value: "none (taxes, commissions and slippage excluded)"
+  source:
+    kind: stated
+    page: 7
+    quote: "Taxes, commissions, and slippage are excluded"
+
+# The comparison portfolio or index the paper measures against.
+benchmark:
+  value: "Equal-weighted portfolio of the ten sectors, rebalanced monthly"
+  # Page 5 introduces this portfolio "for comparison", alongside the S&P 500. It is the EQ-Weight
+  # column of every Exhibit 4 table (pages 8-9). The paper never calls it "the benchmark".
+  source:
+    kind: stated
+    page: 5
+    quote: "a portfolio that is equal weighted among the ten sectors, rebalanced monthly"
+
+# First and last month of the paper's sample, as YYYY-MM. Start must be before end.
+sample_start:
+  value: "1928-01"
+  source:
+    kind: inferred
+    page: 3
+    section: "Data"
+    reason: >-
+      Stated: the year 1928. Page 3 says "Our study begins in 1928 since a year is needed for a
+      ranking period", and every exhibit title reads 1928-2009. Assumed: the month. No start month
+      is given anywhere, so January 1928 is assumed. (The data start in July 1926, so a 12-month
+      ranking would allow a start in mid-1927; the paper says 1928.)
+
+sample_end:
+  value: "2009-12"
+  source:
+    kind: inferred
+    page: 3
+    section: "Data"
+    reason: >-
+      Page 3 says the returns run "through December 2009", and every exhibit is titled 1928-2009,
+      so the sample is taken to end in December 2009.
+
+# Lookback windows in months: positive, unique, sorted ascending.
+# The 1, 3, 6, 9 and 12 month combination (an average of the five trailing returns, page 7;
+# Exhibit 4.6) is not a single lookback and cannot be expressed in this format.
+lookbacks_months:
+  value: [1, 3, 6, 9, 12]
+  source:
+    kind: inferred
+    page: 8
+    reason: >-
+      Exhibits 4.1 to 4.5 (titles on page 8) report 1, 3, 6, 9 and 12 month relative strength
+      portfolios. Page 6 says periods range "from one to twelve months", but only these five are
+      reported.
+
+# Number of securities held in the top portfolio: positive, unique, sorted ascending.
+top_n:
+  value: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  source:
+    kind: inferred
+    page: 8
+    reason: >-
+      Every Exhibit 4 table has columns Top1 to Top9 (table images on pages 8-9; the text layer
+      has no table content). Page 6: "The system invests in the top X sectors."
+
+# Months between the end of the signal window and the trade (0 = trade at once).
+signal_lag_months:
+  value: 0
+  source:
+    kind: stated
+    page: 7
+    quote: "All entry and exit prices are on the day of the signal at the close."
+
+# What each metric means. Every claim's `metric` must have an entry here.
+metrics:
+  "CAGR":
+    value: "Compound annual growth rate of the portfolio's monthly total returns, in % per year"
+    source:
+      kind: inferred
+      page: 11
+      section: "Exhibit 6"
+      reason: >-
+        The paper never defines CAGR. The exhibit tables have a CAGR row, and Exhibit 6 (page 11)
+        is titled "CAGR Outperformance by Decade" with its text saying "on a yearly compounded
+        basis", so CAGR is read as the geometric annualised return of the total-return series.
+  "volatility":
+    value: "Annualised standard deviation of monthly total returns, in % per year"
+    source:
+      kind: inferred
+      page: 8
+      section: "Exhibits 3 and 4.1 to 4.5"
+      reason: >-
+        Inferred from the STDEV row label of the exhibit tables (images). The paper does not say
+        how it is computed. Assumed: that it is the standard deviation of monthly returns scaled
+        by the square root of 12 (the values, 18% to 23%, are only plausible for an annualised
+        figure), and which standard-deviation estimator is used.
+  "Sharpe ratio":
+    value: "(CAGR - 3.81%) / volatility, with 3.81% per year the T-bill return"
+    source:
+      kind: inferred
+      page: 8
+      section: "Exhibits 3 and 4.1 to 4.5"
+      reason: >-
+        The paper does not define its Sharpe ratio. The 3.81% is a table value: it is printed in
+        the row label "SHARPE (3.81%)" of Exhibit 3 (page 5) and Exhibits 4.1 to 4.5 (page 8),
+        all images. The label does not say what 3.81% is; it is taken to be the T-bill return
+        over 1928-2009. The formula was found by testing, not read from the paper: (CAGR - 3.81) /
+        STDEV, rounded to two decimals, matches all 46 printed Sharpe cells (45 in Exhibits 4.1 to
+        4.5 and the benchmark in Exhibit 3) except two, C111 and C179, whose differences are within
+        rounding of the printed inputs (see their notes).
+  "max drawdown":
+    value: "Largest peak-to-trough fall of the cumulative total return, in %, stored as a negative number"
+    source:
+      kind: inferred
+      page: 8
+      section: "Exhibits 3 and 4.1 to 4.5"
+      reason: >-
+        Inferred from the MAXDD row label (images); the table prints the figure in parentheses,
+        which is stored here as a negative number. Assumed: that the drawdown is measured on
+        month-end values of the total-return series, since the paper does not say.
+  "best year":
+    value: "Highest calendar-year total return, in %"
+    source:
+      kind: inferred
+      page: 9
+      section: "Exhibit 4.6"
+      reason: >-
+        Inferred from the BEST YEAR row label of Exhibit 4.6 (image). Assumed: that a year means
+        a calendar year, not a rolling 12 months.
+  "worst year":
+    value: "Lowest calendar-year total return, in %, stored as a negative number"
+    source:
+      kind: inferred
+      page: 9
+      section: "Exhibit 4.6"
+      reason: >-
+        Inferred from the WORST YEAR row label of Exhibit 4.6 (image); the table prints the figure
+        in parentheses. Assumed: that a year means a calendar year, not a rolling 12 months.
+  "turnover":
+    value: "Turnover of the portfolio as printed in Exhibit 4.6, in %; definition and period unknown"
+    source:
+      kind: assumed
+      reason: >-
+        The paper does not define turnover or say over what period it is measured; page 19 says
+        only that "turnover of 100% to 400% is very high". Exhibit 4.6 has a Turnover row (image).
+        The unit is taken to be percent of portfolio value traded, which is assumed.
+
+# Headline numbers the replication will be checked against. Ids are C1, C2, ...
+#
+# HEADLINE NOT REPRESENTABLE. The paper's headline (abstract, page 1; repeated on page 9) is
+#   "The relative strength portfolios outperform the buy and hold benchmark in approximately 70%
+#    of all years", with "300-600 basis points of outperformance per year" (page 9).
+# It covers all portfolios at once, so it has no single lookback_months / top_n, and it is
+# therefore left out rather than forced onto one combination. Exhibit 4.6 (the 1-3-6-9-12
+# combination, page 9) is left out for the same reason.
+#
+# TABLE NUMBERS. Every exhibit is an image: papers/faber-2010.txt contains the exhibit titles but
+# none of the numbers. Each claim below was read from the rendered PDF page, so it cannot carry a
+# quote; it has kind `table`, the exhibit name as `section` and the row and column as `locator`.
+# A second independent reading by a different model agreed on all 187 values (quaver compare-readings,
+# 2026-11-06). What each metric means is defined in `metrics` above; max drawdown, worst year and similar figures are printed in
+# parentheses (negative) and stored as negative numbers.
+# The EQ-Weight column of each Exhibit 4 table repeats the Exhibit 3 benchmark figures, so it is
+# recorded once, as benchmark claims at the end.
+claims:
+  - id: "C1"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 1: CAGR 12.63% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.63
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top1"
+  - id: "C2"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 1: volatility 23.00% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 23.00
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top1"
+  - id: "C3"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 1: Sharpe ratio 0.38 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.38
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top1"
+  - id: "C4"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 1: max drawdown (81.69%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -81.69
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top1"
+  - id: "C5"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 2: CAGR 13.74% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.74
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top2"
+  - id: "C6"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 2: volatility 20.46% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 20.46
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top2"
+  - id: "C7"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 2: Sharpe ratio 0.49 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.49
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top2"
+  - id: "C8"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 2: max drawdown (74.21%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -74.21
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top2"
+  - id: "C9"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 3: CAGR 14.43% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 14.43
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top3"
+  - id: "C10"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 3: volatility 19.79% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.79
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top3"
+  - id: "C11"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 3: Sharpe ratio 0.54 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.54
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top3"
+  - id: "C12"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 3: max drawdown (74.65%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -74.65
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top3"
+  - id: "C13"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 4: CAGR 13.88% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.88
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top4"
+  - id: "C14"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 4: volatility 19.17% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.17
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top4"
+  - id: "C15"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 4: Sharpe ratio 0.53 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.53
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top4"
+  - id: "C16"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 4: max drawdown (76.36%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.36
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top4"
+  - id: "C17"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 5: CAGR 12.91% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.91
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top5"
+  - id: "C18"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 5: volatility 18.81% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.81
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top5"
+  - id: "C19"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 5: Sharpe ratio 0.48 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.48
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top5"
+  - id: "C20"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 5: max drawdown (76.53%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.53
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top5"
+  - id: "C21"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 6: CAGR 12.47% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.47
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top6"
+  - id: "C22"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 6: volatility 18.80% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.80
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top6"
+  - id: "C23"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 6: Sharpe ratio 0.46 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.46
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top6"
+  - id: "C24"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 6: max drawdown (78.31%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -78.31
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top6"
+  - id: "C25"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 7: CAGR 12.01% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.01
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top7"
+  - id: "C26"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 7: volatility 18.62% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.62
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top7"
+  - id: "C27"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 7: Sharpe ratio 0.44 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.44
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top7"
+  - id: "C28"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 7: max drawdown (78.66%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -78.66
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top7"
+  - id: "C29"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 8: CAGR 11.85% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.85
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top8"
+  - id: "C30"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 8: volatility 18.51% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.51
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top8"
+  - id: "C31"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 8: Sharpe ratio 0.43 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.43
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top8"
+  - id: "C32"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 8: max drawdown (79.49%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -79.49
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top8"
+  - id: "C33"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 9: CAGR 11.22% (Exhibit 4.1, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 1
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.22
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row CAGR, column Top9"
+  - id: "C34"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 9: volatility 18.43% (Exhibit 4.1, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 1
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.43
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row STDEV, column Top9"
+  - id: "C35"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 9: Sharpe ratio 0.40 (Exhibit 4.1, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 1
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.40
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row SHARPE (3.81%), column Top9"
+  - id: "C36"
+    subject: "strategy"
+    statement: "1-month relative strength, Top 9: max drawdown (80.62%) (Exhibit 4.1, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 1
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -80.62
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.1"
+      locator: "row MAXDD, column Top9"
+  - id: "C37"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 1: CAGR 13.32% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.32
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top1"
+  - id: "C38"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 1: volatility 20.79% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 20.79
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top1"
+  - id: "C39"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 1: Sharpe ratio 0.46 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.46
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top1"
+  - id: "C40"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 1: max drawdown (64.50%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -64.50
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top1"
+  - id: "C41"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 2: CAGR 13.83% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.83
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top2"
+  - id: "C42"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 2: volatility 19.52% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.52
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top2"
+  - id: "C43"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 2: Sharpe ratio 0.51 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.51
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top2"
+  - id: "C44"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 2: max drawdown (70.20%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -70.20
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top2"
+  - id: "C45"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 3: CAGR 13.44% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.44
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top3"
+  - id: "C46"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 3: volatility 18.55% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.55
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top3"
+  - id: "C47"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 3: Sharpe ratio 0.52 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.52
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top3"
+  - id: "C48"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 3: max drawdown (73.92%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -73.92
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top3"
+  - id: "C49"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 4: CAGR 13.08% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.08
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top4"
+  - id: "C50"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 4: volatility 18.40% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.40
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top4"
+  - id: "C51"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 4: Sharpe ratio 0.50 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.50
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top4"
+  - id: "C52"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 4: max drawdown (75.80%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -75.80
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top4"
+  - id: "C53"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 5: CAGR 12.43% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.43
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top5"
+  - id: "C54"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 5: volatility 18.29% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.29
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top5"
+  - id: "C55"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 5: Sharpe ratio 0.47 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.47
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top5"
+  - id: "C56"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 5: max drawdown (77.52%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -77.52
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top5"
+  - id: "C57"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 6: CAGR 11.79% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.79
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top6"
+  - id: "C58"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 6: volatility 18.07% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.07
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top6"
+  - id: "C59"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 6: Sharpe ratio 0.44 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.44
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top6"
+  - id: "C60"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 6: max drawdown (79.23%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -79.23
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top6"
+  - id: "C61"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 7: CAGR 11.40% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.40
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top7"
+  - id: "C62"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 7: volatility 18.14% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.14
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top7"
+  - id: "C63"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 7: Sharpe ratio 0.42 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.42
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top7"
+  - id: "C64"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 7: max drawdown (78.92%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -78.92
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top7"
+  - id: "C65"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 8: CAGR 10.84% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.84
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top8"
+  - id: "C66"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 8: volatility 18.15% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.15
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top8"
+  - id: "C67"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 8: Sharpe ratio 0.39 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.39
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top8"
+  - id: "C68"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 8: max drawdown (80.29%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -80.29
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top8"
+  - id: "C69"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 9: CAGR 10.62% (Exhibit 4.2, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 3
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.62
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row CAGR, column Top9"
+  - id: "C70"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 9: volatility 18.38% (Exhibit 4.2, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 3
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.38
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row STDEV, column Top9"
+  - id: "C71"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 9: Sharpe ratio 0.37 (Exhibit 4.2, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 3
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.37
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row SHARPE (3.81%), column Top9"
+  - id: "C72"
+    subject: "strategy"
+    statement: "3-month relative strength, Top 9: max drawdown (80.57%) (Exhibit 4.2, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 3
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -80.57
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.2"
+      locator: "row MAXDD, column Top9"
+  - id: "C73"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 1: CAGR 12.86% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.86
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top1"
+  - id: "C74"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 1: volatility 21.60% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 21.60
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top1"
+  - id: "C75"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 1: Sharpe ratio 0.42 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.42
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top1"
+  - id: "C76"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 1: max drawdown (90.53%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -90.53
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top1"
+  - id: "C77"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 2: CAGR 14.10% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 14.10
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top2"
+  - id: "C78"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 2: volatility 19.20% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.20
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top2"
+  - id: "C79"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 2: Sharpe ratio 0.54 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.54
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top2"
+  - id: "C80"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 2: max drawdown (84.30%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -84.30
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top2"
+  - id: "C81"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 3: CAGR 13.18% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.18
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top3"
+  - id: "C82"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 3: volatility 18.29% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.29
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top3"
+  - id: "C83"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 3: Sharpe ratio 0.51 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.51
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top3"
+  - id: "C84"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 3: max drawdown (80.97%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -80.97
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top3"
+  - id: "C85"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 4: CAGR 12.60% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.60
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top4"
+  - id: "C86"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 4: volatility 18.02% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.02
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top4"
+  - id: "C87"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 4: Sharpe ratio 0.49 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.49
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top4"
+  - id: "C88"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 4: max drawdown (76.81%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.81
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top4"
+  - id: "C89"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 5: CAGR 12.51% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.51
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top5"
+  - id: "C90"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 5: volatility 17.87% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.87
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top5"
+  - id: "C91"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 5: Sharpe ratio 0.49 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.49
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top5"
+  - id: "C92"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 5: max drawdown (76.19%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.19
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top5"
+  - id: "C93"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 6: CAGR 11.72% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.72
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top6"
+  - id: "C94"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 6: volatility 17.77% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.77
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top6"
+  - id: "C95"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 6: Sharpe ratio 0.45 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.45
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top6"
+  - id: "C96"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 6: max drawdown (77.68%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -77.68
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top6"
+  - id: "C97"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 7: CAGR 11.62% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.62
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top7"
+  - id: "C98"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 7: volatility 17.87% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.87
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top7"
+  - id: "C99"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 7: Sharpe ratio 0.44 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.44
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top7"
+  - id: "C100"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 7: max drawdown (77.87%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -77.87
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top7"
+  - id: "C101"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 8: CAGR 11.01% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.01
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top8"
+  - id: "C102"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 8: volatility 18.01% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.01
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top8"
+  - id: "C103"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 8: Sharpe ratio 0.40 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.40
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top8"
+  - id: "C104"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 8: max drawdown (78.86%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -78.86
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top8"
+  - id: "C105"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 9: CAGR 10.71% (Exhibit 4.3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 6
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.71
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row CAGR, column Top9"
+  - id: "C106"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 9: volatility 18.24% (Exhibit 4.3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 6
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.24
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row STDEV, column Top9"
+  - id: "C107"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 9: Sharpe ratio 0.38 (Exhibit 4.3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 6
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.38
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row SHARPE (3.81%), column Top9"
+  - id: "C108"
+    subject: "strategy"
+    statement: "6-month relative strength, Top 9: max drawdown (80.41%) (Exhibit 4.3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 6
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -80.41
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.3"
+      locator: "row MAXDD, column Top9"
+  - id: "C109"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 1: CAGR 14.80% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 14.80
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top1"
+  - id: "C110"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 1: volatility 22.21% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 22.21
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top1"
+  - id: "C111"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 1: Sharpe ratio 0.50 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.50
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top1"
+      reason: >-
+        Printed value 0.50 kept (reading confirmed at high zoom). Recomputing from the rounded
+        inputs, (14.80 - 3.81) / 22.21 = 0.4948, which is within rounding of the printed 0.50.
+  - id: "C112"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 1: max drawdown (83.52%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -83.52
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top1"
+  - id: "C113"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 2: CAGR 14.17% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 14.17
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top2"
+  - id: "C114"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 2: volatility 19.70% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.70
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top2"
+  - id: "C115"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 2: Sharpe ratio 0.53 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.53
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top2"
+  - id: "C116"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 2: max drawdown (75.94%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -75.94
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top2"
+  - id: "C117"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 3: CAGR 12.60% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.60
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top3"
+  - id: "C118"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 3: volatility 19.00% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.00
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top3"
+  - id: "C119"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 3: Sharpe ratio 0.46 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.46
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top3"
+  - id: "C120"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 3: max drawdown (72.53%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -72.53
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top3"
+  - id: "C121"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 4: CAGR 12.28% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.28
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top4"
+  - id: "C122"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 4: volatility 18.59% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.59
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top4"
+  - id: "C123"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 4: Sharpe ratio 0.46 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.46
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top4"
+  - id: "C124"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 4: max drawdown (75.26%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -75.26
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top4"
+  - id: "C125"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 5: CAGR 12.07% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.07
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top5"
+  - id: "C126"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 5: volatility 18.36% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.36
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top5"
+  - id: "C127"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 5: Sharpe ratio 0.45 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.45
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top5"
+  - id: "C128"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 5: max drawdown (76.35%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.35
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top5"
+  - id: "C129"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 6: CAGR 11.80% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.80
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top6"
+  - id: "C130"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 6: volatility 18.29% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.29
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top6"
+  - id: "C131"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 6: Sharpe ratio 0.44 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.44
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top6"
+  - id: "C132"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 6: max drawdown (76.86%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.86
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top6"
+  - id: "C133"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 7: CAGR 11.48% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.48
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top7"
+  - id: "C134"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 7: volatility 18.06% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.06
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top7"
+  - id: "C135"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 7: Sharpe ratio 0.42 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.42
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top7"
+  - id: "C136"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 7: max drawdown (77.56%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -77.56
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top7"
+  - id: "C137"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 8: CAGR 11.13% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.13
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top8"
+  - id: "C138"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 8: volatility 18.14% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.14
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top8"
+  - id: "C139"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 8: Sharpe ratio 0.40 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.40
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top8"
+  - id: "C140"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 8: max drawdown (79.10%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -79.10
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top8"
+  - id: "C141"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 9: CAGR 10.74% (Exhibit 4.4, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 9
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.74
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row CAGR, column Top9"
+  - id: "C142"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 9: volatility 18.22% (Exhibit 4.4, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 9
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.22
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row STDEV, column Top9"
+  - id: "C143"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 9: Sharpe ratio 0.38 (Exhibit 4.4, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 9
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.38
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row SHARPE (3.81%), column Top9"
+  - id: "C144"
+    subject: "strategy"
+    statement: "9-month relative strength, Top 9: max drawdown (81.35%) (Exhibit 4.4, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 9
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -81.35
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.4"
+      locator: "row MAXDD, column Top9"
+  - id: "C145"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 1: CAGR 16.05% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 16.05
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top1"
+  - id: "C146"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 1: volatility 21.79% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 21.79
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top1"
+  - id: "C147"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 1: Sharpe ratio 0.56 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.56
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top1"
+  - id: "C148"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 1: max drawdown (76.91%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 1
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.91
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top1"
+  - id: "C149"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 2: CAGR 14.75% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 14.75
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top2"
+  - id: "C150"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 2: volatility 19.57% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 19.57
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top2"
+  - id: "C151"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 2: Sharpe ratio 0.56 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.56
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top2"
+  - id: "C152"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 2: max drawdown (76.27%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 2
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -76.27
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top2"
+  - id: "C153"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 3: CAGR 13.94% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.94
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top3"
+  - id: "C154"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 3: volatility 18.38% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.38
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top3"
+  - id: "C155"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 3: Sharpe ratio 0.55 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.55
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top3"
+  - id: "C156"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 3: max drawdown (71.29%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 3
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -71.29
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top3"
+  - id: "C157"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 4: CAGR 13.41% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 13.41
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top4"
+  - id: "C158"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 4: volatility 18.18% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.18
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top4"
+  - id: "C159"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 4: Sharpe ratio 0.53 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.53
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top4"
+  - id: "C160"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 4: max drawdown (74.01%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 4
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -74.01
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top4"
+  - id: "C161"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 5: CAGR 12.96% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.96
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top5"
+  - id: "C162"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 5: volatility 17.92% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.92
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top5"
+  - id: "C163"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 5: Sharpe ratio 0.51 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.51
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top5"
+  - id: "C164"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 5: max drawdown (74.18%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 5
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -74.18
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top5"
+  - id: "C165"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 6: CAGR 12.50% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 12.50
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top6"
+  - id: "C166"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 6: volatility 17.87% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.87
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top6"
+  - id: "C167"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 6: Sharpe ratio 0.49 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.49
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top6"
+  - id: "C168"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 6: max drawdown (74.23%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 6
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -74.23
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top6"
+  - id: "C169"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 7: CAGR 11.67% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.67
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top7"
+  - id: "C170"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 7: volatility 17.94% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 17.94
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top7"
+  - id: "C171"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 7: Sharpe ratio 0.44 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.44
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top7"
+  - id: "C172"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 7: max drawdown (77.70%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 7
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -77.70
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top7"
+  - id: "C173"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 8: CAGR 11.48% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 11.48
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top8"
+  - id: "C174"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 8: volatility 18.16% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.16
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top8"
+  - id: "C175"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 8: Sharpe ratio 0.42 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.42
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top8"
+  - id: "C176"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 8: max drawdown (79.72%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 8
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -79.72
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top8"
+  - id: "C177"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 9: CAGR 10.82% (Exhibit 4.5, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: 12
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.82
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row CAGR, column Top9"
+  - id: "C178"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 9: volatility 18.23% (Exhibit 4.5, 1928-2009)."
+    metric: "volatility"
+    lookback_months: 12
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.23
+    unit: "% per year"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row STDEV, column Top9"
+  - id: "C179"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 9: Sharpe ratio 0.39 (Exhibit 4.5, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: 12
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.39
+    unit: "ratio"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row SHARPE (3.81%), column Top9"
+      reason: >-
+        Printed value 0.39 kept (reading confirmed at high zoom). Recomputing from the rounded
+        inputs, (10.82 - 3.81) / 18.23 = 0.3845, which is within rounding of the printed 0.39
+        (only if the rounding of the 3.81% rate is counted along with that of CAGR and STDEV).
+  - id: "C180"
+    subject: "strategy"
+    statement: "12-month relative strength, Top 9: max drawdown (81.07%) (Exhibit 4.5, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: 12
+    top_n: 9
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -81.07
+    unit: "%"
+    source:
+      kind: table
+      page: 8
+      section: "Exhibit 4.5"
+      locator: "row MAXDD, column Top9"
+
+  # Benchmark: the equal-weighted ten-sector portfolio. The S&P 500 column of Exhibit 3
+  # (CAGR 9.39%, STDEV 19.39%, Sharpe 0.29, MAXDD (83.66%)) is a second comparison, not the
+  # benchmark, and is left out. Best year, worst year and turnover appear only in Exhibit 4.6.
+  - id: "C181"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: CAGR 10.28% (Exhibit 3, 1928-2009)."
+    metric: "CAGR"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 10.28
+    unit: "% per year"
+    source:
+      kind: table
+      page: 5
+      section: "Exhibit 3"
+      locator: "row CAGR, column Equal Weight"
+  - id: "C182"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: volatility 18.38% (Exhibit 3, 1928-2009)."
+    metric: "volatility"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 18.38
+    unit: "% per year"
+    source:
+      kind: table
+      page: 5
+      section: "Exhibit 3"
+      locator: "row STDEV, column Equal Weight"
+  - id: "C183"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: Sharpe ratio 0.35 (Exhibit 3, 1928-2009)."
+    metric: "Sharpe ratio"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.35
+    unit: "ratio"
+    source:
+      kind: table
+      page: 5
+      section: "Exhibit 3"
+      locator: "row SHARPE (3.81%), column Equal Weight"
+  - id: "C184"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: max drawdown (81.67%) (Exhibit 3, 1928-2009)."
+    metric: "max drawdown"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -81.67
+    unit: "%"
+    source:
+      kind: table
+      page: 5
+      section: "Exhibit 3"
+      locator: "row MAXDD, column Equal Weight"
+  - id: "C185"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: best year 53.38% (Exhibit 4.6, 1928-2009)."
+    metric: "best year"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 53.38
+    unit: "%"
+    source:
+      kind: table
+      page: 9
+      section: "Exhibit 4.6"
+      locator: "row BEST YEAR, column EQ-Weight"
+  - id: "C186"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: worst year (38.21%) (Exhibit 4.6, 1928-2009)."
+    metric: "worst year"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: -38.21
+    unit: "%"
+    source:
+      kind: table
+      page: 9
+      section: "Exhibit 4.6"
+      locator: "row WORST YEAR, column EQ-Weight"
+  - id: "C187"
+    subject: "benchmark"
+    statement: "Equal-weighted benchmark: turnover 0% (Exhibit 4.6, 1928-2009)."
+    metric: "turnover"
+    lookback_months: null
+    top_n: null
+    period_start: "1928-01"
+    period_end: "2009-12"
+    value: 0.00
+    unit: "%"
+    source:
+      kind: table
+      page: 9
+      section: "Exhibit 4.6"
+      locator: "row Turnover, column EQ-Weight"
+      reason: >-
+        The paper does not define turnover or its period; not used in any pre-registered test.
+        The printed 0 is also in tension with the benchmark being rebalanced monthly (page 5).

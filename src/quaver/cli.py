@@ -29,8 +29,10 @@ def _validate_spec(path: Path) -> int:
         print(f"invalid: {path}\n{error}", file=sys.stderr)
         return 1
     counts = provenance_counts(spec)
+    n_claims = len(spec.claims)
+    claims = "1 claim" if n_claims == 1 else f"{n_claims} claims"
     print(
-        f"valid: {spec.paper.title} ({spec.paper.year}), {len(spec.claims)} claims, "
+        f"valid: {spec.paper.title} ({spec.paper.year}), {claims}, "
         f"sources: {counts[Provenance.STATED]} stated, "
         f"{counts[Provenance.INFERRED]} inferred, "
         f"{counts[Provenance.ASSUMED]} assumed"

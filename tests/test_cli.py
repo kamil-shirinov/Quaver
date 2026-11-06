@@ -1,6 +1,8 @@
+import copy
 from pathlib import Path
 
 import pytest
+import yaml
 
 from quaver.cli import main
 
@@ -13,8 +15,19 @@ def test_validate_spec_success(capsys: pytest.CaptureFixture[str], tmp_path: Pat
     assert main(["validate-spec", str(path)]) == 0
     out = capsys.readouterr().out
     assert out == (
-        "valid: Example Paper (2000), 1 claims, sources: 10 stated, 2 inferred, 2 assumed\n"
+        "valid: Example Paper (2000), 1 claim, sources: 10 stated, 2 inferred, 2 assumed\n"
     )
+
+
+def test_validate_spec_plural_claims(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    data = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
+    second = copy.deepcopy(data["claims"][0])
+    second["id"] = "C2"
+    data["claims"].append(second)
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    assert main(["validate-spec", str(path)]) == 0
+    assert "), 2 claims, sources:" in capsys.readouterr().out
 
 
 def test_validate_spec_invalid_content(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

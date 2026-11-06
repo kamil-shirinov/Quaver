@@ -135,6 +135,17 @@ def test_year_month_invalid_in_sample(field: str) -> None:
         StrategySpec.model_validate(data)
 
 
+@pytest.mark.parametrize(("start", "end"), [("1960-01", "1990-12"), ("1975-06", "1975-06")])
+def test_claim_period_in_order(start: str, end: str) -> None:
+    claim = Claim.model_validate(claim_fields(period_start=start, period_end=end))
+    assert (claim.period_start, claim.period_end) == (start, end)
+
+
+def test_claim_period_start_after_end() -> None:
+    with pytest.raises(ValidationError, match="period_start must not be after period_end"):
+        Claim.model_validate(claim_fields(period_start="1990-12", period_end="1990-11"))
+
+
 # --- StrategySpec rules ---------------------------------------------------------------------
 
 

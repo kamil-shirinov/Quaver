@@ -105,6 +105,12 @@ class Claim(_Frozen):
     unit: str
     source: Source
 
+    @model_validator(mode="after")
+    def _check_period_order(self) -> Self:
+        if self.period_start > self.period_end:
+            raise ValueError("period_start must not be after period_end")
+        return self
+
 
 class StrategySpec(_Frozen):
     """A momentum strategy as written in a paper, every field cited."""

@@ -1,4 +1,4 @@
-# QuaVer strategy spec template. Every value below is made up.
+# Quaver strategy spec template. Every value below is made up.
 #
 # Every value carries a `source` saying where it came from:
 #   stated   - the paper says it. Give `page` (>= 1) and `quote` (at most 25 words, verbatim).

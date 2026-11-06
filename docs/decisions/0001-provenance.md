@@ -1,7 +1,7 @@
 # 0001. Per-field provenance in strategy specs
 
 ## Context
-QuaVer rebuilds strategies from papers and checks whether the published results hold.
+Quaver rebuilds strategies from papers and checks whether the published results hold.
 A replication is only as checkable as its inputs: a reviewer must be able to see, for
 every parameter, whether the paper says it or we chose it.
 

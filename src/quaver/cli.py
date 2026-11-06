@@ -1,4 +1,4 @@
-"""Command-line entry point: ``validate-spec``, ``check-quotes`` and ``compare-readings``."""
+"""Command-line entry point: ``quaver <command>``, one subcommand per check."""
 
 import argparse
 import sys
@@ -8,9 +8,13 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
+from quaver.data import DataError, load_french10
 from quaver.quotes import check_quotes, load_pages
 from quaver.readings import claim_key, compare_claims, describe_key, load_claims, locate
 from quaver.spec import Provenance, StrategySpec, load_spec, provenance_counts
+
+DEFAULT_CSV = Path("data/raw/10_Industry_Portfolios.csv")
+DEFAULT_PINS = Path("data/pins.json")
 
 
 def _format_errors(error: ValidationError) -> str:
@@ -98,6 +102,19 @@ def _compare_readings(path_a: Path, path_b: Path) -> int:
     return 1
 
 
+def _data_check(csv: Path, pins: Path) -> int:
+    try:
+        data = load_french10(csv, pins)
+    except (OSError, DataError) as error:
+        print(f"invalid: {error}", file=sys.stderr)
+        return 1
+    print(
+        f"{csv.name}: {len(data.months)} months, {data.months[0]} to {data.months[-1]}, "
+        f"{len(data.industries)} industries, no missing values"
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="quaver")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -113,7 +130,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     compare.add_argument("a", type=Path, help="YAML file with a claims list (a full spec works)")
     compare.add_argument("b", type=Path, help="YAML file with a claims list (nothing else needed)")
+    check = subparsers.add_parser(
+        "data-check", help="verify the pinned French 10 industry file and parse it"
+    )
+    check.add_argument("--csv", type=Path, default=DEFAULT_CSV)
+    check.add_argument("--pins", type=Path, default=DEFAULT_PINS)
     args = parser.parse_args(argv)
+    if args.command == "data-check":
+        return _data_check(args.csv, args.pins)
     if args.command == "check-quotes":
         return _check_quotes(args.spec, args.text)
     if args.command == "compare-readings":

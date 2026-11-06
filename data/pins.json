@@ -1,0 +1,14 @@
+{
+  "french_10_industries": {
+    "url": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/10_Industry_Portfolios_CSV.zip",
+    "downloaded": "2026-11-06",
+    "zip_sha256": "cee051709825e60cc38f2aff01c2dec52265aa7ea4a1fefa023a2c8114a5166e",
+    "csv_name": "10_Industry_Portfolios.csv",
+    "csv_sha256": "921e2df7ae95355cf9030aebc8b2033c267f3153fb99a676ff912b3ea65d1ed3",
+    "table": "Average Value Weighted Returns -- Monthly",
+    "first_month": "1926-07",
+    "end_month": "2026-09",
+    "months": 1203,
+    "industries": ["NoDur", "Durbl", "Manuf", "Enrgy", "HiTec", "Telcm", "Shops", "Hlth", "Utils", "Other"]
+  }
+}

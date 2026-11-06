@@ -1,0 +1,28 @@
+Made-up fixture that mimics the layout of French's file. Not real data.
+
+Missing data are indicated by -99.99 or -999.
+
+
+  Average Value Weighted Returns -- Monthly
+,NoDur,Durbl,Manuf,Enrgy,HiTec,Telcm,Shops,Hlth,Utils,Other
+199011,    -3.00,   -2.75,   -2.50,   -2.25,   -2.00,   -1.75,   -1.50,   -1.25,   -1.00,   -0.75
+199012,    -0.50,   -0.25,    0.00,    0.25,    0.50,    0.75,    1.00,    1.25,    1.50,    1.75
+199101,     2.00,    2.25,    2.50,    2.75,    3.00,    3.25,    3.50,    3.75,    4.00,    4.25
+199102,     4.50,    4.75,    5.00,    5.25,    5.50,    5.75,    6.00,    6.25,    6.50,    6.75
+
+
+  Average Equal Weighted Returns -- Monthly
+,NoDur,Durbl,Manuf,Enrgy,HiTec,Telcm,Shops,Hlth,Utils,Other
+199011,     1.00,    0.88,    0.75,    0.62,    0.50,    0.38,    0.25,    0.12,    0.00,   -0.12
+199012,    -0.25,   -0.38,   -0.50,   -0.62,   -0.75,   -0.88,   -1.00,   -1.12,   -1.25,   -1.38
+199101,    -1.50,   -1.62,   -1.75,   -1.88,   -2.00,   -2.12,   -2.25,   -2.38,   -2.50,   -2.62
+199102,    -2.75,   -2.88,   -3.00,   -3.12,   -3.25,   -3.38,   -3.50,   -3.62,   -3.75,   -3.88
+
+
+  Average Value Weighted Returns -- Annual
+,NoDur,Durbl,Manuf,Enrgy,HiTec,Telcm,Shops,Hlth,Utils,Other
+1990,    14.50,   14.75,   15.00,   15.25,   15.50,   15.75,   16.00,   16.25,   16.50,   16.75
+1991,    17.00,   17.25,   17.50,   17.75,   18.00,   18.25,   18.50,   18.75,   19.00,   19.25
+
+
+Copyright 2000 Nobody

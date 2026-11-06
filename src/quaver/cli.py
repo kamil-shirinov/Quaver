@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from quaver.data import DataError, load_french10
 from quaver.quotes import check_quotes, load_pages
 from quaver.readings import claim_key, compare_claims, describe_key, load_claims, locate
+from quaver.runs import Outcome, run_after, run_test3_in
 from quaver.spec import Provenance, StrategySpec, load_spec, provenance_counts
 from quaver.test1 import RunRefused, run_test1
 
@@ -130,6 +131,20 @@ def _run_test1(rerun: str | None) -> int:
     return 0
 
 
+def _run_later_test(name: str, rerun: str | None) -> int:
+    runner = run_test3_in if name == "run-test3-in" else run_after
+    try:
+        outcome: Outcome = runner(Path.cwd(), rerun)
+    except RunRefused as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
+    labels = {"test2": "Test 2 (after publication)", "test3": "Test 3 (luck)"}
+    for key, verdict in outcome.verdicts.items():
+        print(f"{labels[key]}: {verdict}")
+    print(f"wrote {outcome.result_path} and {outcome.report_path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="quaver")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -158,7 +173,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="REASON",
         help="run again although a result exists; the old result is kept and the reason recorded",
     )
+    for name, help_text in (
+        ("run-test3-in", "run Test 3 (luck) in-sample, 1928-01 to 2009-12; it runs once"),
+        ("run-after", "run Test 2 and Test 3 after publication, 2010-01 to END; it runs once"),
+    ):
+        later = subparsers.add_parser(name, help=help_text)
+        later.add_argument(
+            "--rerun",
+            metavar="REASON",
+            help="run again although a result exists; the old result is kept and the reason "
+            "recorded",
+        )
     args = parser.parse_args(argv)
+    if args.command in ("run-test3-in", "run-after"):
+        return _run_later_test(args.command, args.rerun)
     if args.command == "run-test1":
         return _run_test1(args.rerun)
     if args.command == "data-check":

@@ -223,8 +223,12 @@ def test_after_publication_details() -> None:
     assert details["ratio_after_to_in_sample"] == pytest.approx(
         details["test2"]["estimate"] / in_sample
     )
+    # Section 2: all 45 versions, by lookback, then holding count; Top1 to Top3 are the family.
     assert [(v["lookback"], v["top_n"]) for v in details["versions"]] == [
-        (lb, n) for lb in (1, 3, 6, 9, 12) for n in (1, 2, 3)
+        (lb, n) for lb in (1, 3, 6, 9, 12) for n in range(1, 10)
+    ]
+    assert [v["in_family"] for v in details["versions"]] == [
+        n <= 3 for _ in range(5) for n in range(1, 10)
     ]
     bench = benchmark_returns(data, "2003-01", "2004-09")
     for v in details["versions"]:

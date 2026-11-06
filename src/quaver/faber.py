@@ -21,6 +21,10 @@ IN_SAMPLE_LAST = "2009-12"
 # Pre-registration, section 5: "the 15 versions with N in {1, 2, 3}, across all five lookbacks."
 FAMILY_LOOKBACKS = (1, 3, 6, 9, 12)
 FAMILY_HOLDINGS = (1, 2, 3)
+# Pre-registration, section 2: "each lookback L in {1, 3, 6, 9, 12} months and each holding count
+# N in {1, ..., 9}: 45 versions."
+LOOKBACKS = (1, 3, 6, 9, 12)
+HOLDINGS = (1, 2, 3, 4, 5, 6, 7, 8, 9)
 
 
 @dataclass(frozen=True, eq=False)

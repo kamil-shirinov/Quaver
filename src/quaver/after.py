@@ -14,7 +14,8 @@ from quaver import metrics
 from quaver.data import French10
 from quaver.faber import (
     FAMILY_HOLDINGS,
-    FAMILY_LOOKBACKS,
+    HOLDINGS,
+    LOOKBACKS,
     FloatArray,
     benchmark_returns,
     family_returns,
@@ -211,18 +212,27 @@ def complete_years_figure(data: French10, first: str, last: str) -> dict[str, An
 def after_publication(
     data: French10, first: str, last: str, in_first: str, in_last: str
 ) -> dict[str, Any]:
-    """Everything section 5 reports: the test, the in-sample statistic, the ratio, the versions."""
+    """Everything section 5 reports: the test, the in-sample statistic, the ratio, the versions.
+
+    "Every version's after-publication numbers": all 45 versions of section 2, by lookback, then
+    holding count. ``in_family`` marks the 15 that make up the family.
+    """
     after = test2(data, first, last)
     in_sample = family_statistic(data, in_first, in_last)
     bench = benchmark_returns(data, first, last)
     start = data.months.index(first)
     months: tuple[str, ...] = data.months[start : start + bench.size]
     versions = []
-    for lookback in FAMILY_LOOKBACKS:
-        for n in FAMILY_HOLDINGS:
+    for lookback in LOOKBACKS:
+        for n in HOLDINGS:
             version = version_returns(data, lookback, n, first, last)
             versions.append(
-                {"lookback": lookback, "top_n": n, **describe(version.returns, months, bench)}
+                {
+                    "lookback": lookback,
+                    "top_n": n,
+                    "in_family": n in FAMILY_HOLDINGS,
+                    **describe(version.returns, months, bench),
+                }
             )
     return {
         "test2": after.to_json(),

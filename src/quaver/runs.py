@@ -357,9 +357,9 @@ def render_after(result: dict[str, Any]) -> str:
         "",
         "## Every version after publication",
         "",
-        "Percent. CAGR, volatility, max drawdown and excess use every month. Years beating the "
-        "benchmark use complete calendar years only; partial years are listed separately "
-        "(amendment 01, item 1).",
+        "All 45 versions; Top1 to Top3 make up the family. Percent. CAGR, volatility, max "
+        "drawdown and excess use every month. Years beating the benchmark use complete calendar "
+        "years only; partial years are listed separately (amendment 01, item 1).",
         "",
     ]
     rows = [

@@ -270,7 +270,8 @@ def test_after(tmp_path: Path) -> None:
     assert result["ratio_after_to_in_sample"] == pytest.approx(
         t2["estimate"] / result["in_sample"]["estimate"]
     )
-    assert len(result["versions"]) == 15
+    assert len(result["versions"]) == 45
+    assert sum(v["in_family"] for v in result["versions"]) == 15
     assert list(result["family"]["calendar_years"]) == ["2010"]
     assert result["family"]["partial_years"][0] | {"return": 0} == {
         "year": 2011,
@@ -291,6 +292,8 @@ def test_after(tmp_path: Path) -> None:
     assert report.index("Statistic:") < report.index("```text")
     assert report.count("<-- real") == 1
     assert "| L12 Top3 |" in report
+    assert "| L1 Top9 |" in report
+    assert "All 45 versions; Top1 to Top3 make up the family." in report
     assert "| 2010 |" in report
     assert "Partial year, reported separately" in report
     assert "2011-01 to 2011-09" in report

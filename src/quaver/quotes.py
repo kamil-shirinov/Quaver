@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from quaver.spec import StrategySpec, sources
+from quaver.spec import Provenance, StrategySpec, sources
 
 _PAGE_MARKER = re.compile(r"^=== page (\d+) ===[ \t]*$", re.MULTILINE)
 # A hyphen right after a non-space character, then the end of the line, then any indentation.
@@ -29,6 +29,15 @@ class QuoteFailure:
     where: str
     page: int | None
     quote: str
+
+
+@dataclass(frozen=True)
+class QuoteCheck:
+    """The outcome of checking a spec: quotes checked, table values skipped, failures."""
+
+    checked: int
+    skipped: int
+    failures: list[QuoteFailure]
 
 
 def split_pages(text: str) -> dict[int, str]:
@@ -82,18 +91,21 @@ def quote_on_page(quote: str, page_text: str) -> bool:
     return bool(needle) and any(_matches_at(page, i, needle, 0) for i in range(len(page) + 1))
 
 
-def check_quotes(spec: StrategySpec, pages: dict[int, str]) -> tuple[int, list[QuoteFailure]]:
-    """Check every quoted source. Returns the number of quotes checked and the failures."""
-    checked = 0
+def check_quotes(spec: StrategySpec, pages: dict[int, str]) -> QuoteCheck:
+    """Check every quoted source. Table sources have no quote and are counted as skipped."""
+    checked = skipped = 0
     failures: list[QuoteFailure] = []
     for where, source in sources(spec):
+        if source.kind is Provenance.TABLE:
+            skipped += 1
+            continue
         if source.quote is None:
             continue
         checked += 1
         # A quote without a page (allowed on an assumed source) cannot be checked, so it fails.
         if source.page is None or not quote_on_page(source.quote, pages.get(source.page, "")):
             failures.append(QuoteFailure(where, source.page, source.quote))
-    return checked, failures
+    return QuoteCheck(checked, skipped, failures)
 
 
 def load_pages(path: Path) -> dict[int, str]:

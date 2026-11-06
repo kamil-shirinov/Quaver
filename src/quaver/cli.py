@@ -1,4 +1,4 @@
-"""Command-line entry point: ``quaver validate-spec SPEC`` and ``quaver check-quotes SPEC TEXT``."""
+"""Command-line entry point: ``validate-spec``, ``check-quotes`` and ``compare-readings``."""
 
 import argparse
 import sys
@@ -9,6 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from quaver.quotes import check_quotes, load_pages
+from quaver.readings import claim_key, compare_claims, describe_key, load_claims, locate
 from quaver.spec import Provenance, StrategySpec, load_spec, provenance_counts
 
 
@@ -41,7 +42,8 @@ def _validate_spec(path: Path) -> int:
         f"valid: {spec.paper.title} ({spec.paper.year}), {claims}, "
         f"sources: {counts[Provenance.STATED]} stated, "
         f"{counts[Provenance.INFERRED]} inferred, "
-        f"{counts[Provenance.ASSUMED]} assumed"
+        f"{counts[Provenance.ASSUMED]} assumed, "
+        f"{counts[Provenance.TABLE]} table"
         + (", unverified" if spec.extraction.verified_by is None else "")
     )
     return 0
@@ -56,15 +58,44 @@ def _check_quotes(spec_path: Path, text_path: Path) -> int:
     except (OSError, ValueError) as error:
         print(f"invalid: {text_path}\n{error}", file=sys.stderr)
         return 1
-    checked, failures = check_quotes(spec, pages)
-    for failure in failures:
+    result = check_quotes(spec, pages)
+    for failure in result.failures:
         page = "no page" if failure.page is None else f"page {failure.page}"
         print(f"not found: {failure.where}, {page}: {failure.quote!r}")
-    if failures:
-        print(f"{len(failures)} of {checked} quotes not found", file=sys.stderr)
+    if result.failures:
+        print(f"{len(result.failures)} of {result.checked} quotes not found", file=sys.stderr)
         return 1
-    print(f"all {checked} quotes found")
+    values = "1 table value" if result.skipped == 1 else f"{result.skipped} table values"
+    print(f"all {result.checked} quotes found, {values} skipped (not quotable)")
     return 0
+
+
+def _compare_readings(path_a: Path, path_b: Path) -> int:
+    try:
+        claims_a, claims_b = load_claims(path_a), load_claims(path_b)
+    except ValidationError as error:
+        print(f"invalid readings\n{_format_errors(error)}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        print(f"invalid readings\n{error}", file=sys.stderr)
+        return 1
+    result = compare_claims(claims_a, claims_b)
+    print(f"matched {result.matched} claim" + ("" if result.matched == 1 else "s"))
+    for diff in result.differing:
+        print(f"differs: {describe_key(claim_key(diff.a))}")
+        print(f"  A {diff.a.id}: {diff.a.value} ({locate(diff.a.source)})")
+        print(f"  B {diff.b.id}: {diff.b.value} ({locate(diff.b.source)})")
+    for label, claims in (("A", result.only_a), ("B", result.only_b)):
+        for claim in claims:
+            print(f"only in {label}: {claim.id}, {describe_key(claim_key(claim))}")
+    if result.agrees:
+        return 0
+    print(
+        f"{len(result.differing)} differ, {len(result.only_a)} only in A, "
+        f"{len(result.only_b)} only in B",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -77,9 +108,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     quotes.add_argument("spec", type=Path)
     quotes.add_argument("text", type=Path, help='paper text with "=== page N ===" markers')
+    compare = subparsers.add_parser(
+        "compare-readings", help="compare the claims of two independent readings of one paper"
+    )
+    compare.add_argument("a", type=Path, help="YAML file with a claims list (a full spec works)")
+    compare.add_argument("b", type=Path, help="YAML file with a claims list (nothing else needed)")
     args = parser.parse_args(argv)
     if args.command == "check-quotes":
         return _check_quotes(args.spec, args.text)
+    if args.command == "compare-readings":
+        return _compare_readings(args.a, args.b)
     return _validate_spec(args.path)
 
 

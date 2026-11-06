@@ -1,0 +1,47 @@
+# A second reading: only a claims list.
+claims:
+- id: C1
+  subject: strategy
+  statement: The 12-month top-10 portfolio earns 1.1 percent per month.
+  metric: mean_monthly_return
+  lookback_months: 12
+  top_n: 10
+  period_start: 1960-01
+  period_end: 1990-12
+  value: 1.1
+  unit: percent_per_month
+  source:
+    kind: stated
+    page: 7
+    section: Table 1
+    quote: 'Top-decile portfolio, 12-month formation: 1.10 percent per month.'
+- id: C2
+  subject: benchmark
+  statement: The equal-weighted market portfolio earns 0.9 percent per month.
+  metric: mean_monthly_return
+  lookback_months: null
+  top_n: null
+  period_start: 1960-01
+  period_end: 1990-12
+  value: 0.9
+  unit: percent_per_month
+  source:
+    kind: stated
+    page: 7
+    section: Table 1
+    quote: The equal-weighted market portfolio earns 0.90 percent per month.
+- id: C3
+  subject: strategy
+  statement: The 12-month top-10 portfolio has annual volatility of 4.2 percent.
+  metric: annualised_volatility
+  lookback_months: 12
+  top_n: 10
+  period_start: 1960-01
+  period_end: 1990-12
+  value: 4.2
+  unit: percent_per_year
+  source:
+    kind: table
+    page: 7
+    section: Table 1
+    locator: row Top-decile 12-month, column Volatility

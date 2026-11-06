@@ -27,7 +27,8 @@ def test_validate_spec_success(capsys: pytest.CaptureFixture[str], tmp_path: Pat
     assert main(["validate-spec", str(path)]) == 0
     out = capsys.readouterr().out
     assert out == (
-        "valid: Example Paper (2000), 2 claims, sources: 11 stated, 2 inferred, 2 assumed\n"
+        "valid: Example Paper (2000), 3 claims, sources: 11 stated, 3 inferred, 3 assumed, "
+        "1 table\n"
     )
 
 
@@ -43,8 +44,8 @@ def test_validate_spec_unverified(capsys: pytest.CaptureFixture[str], tmp_path: 
     data["extraction"]["verified_by"] = None
     assert main(["validate-spec", str(write_spec(tmp_path, data))]) == 0
     assert capsys.readouterr().out == (
-        "valid: Example Paper (2000), 2 claims, sources: 11 stated, 2 inferred, 2 assumed, "
-        "unverified\n"
+        "valid: Example Paper (2000), 3 claims, sources: 11 stated, 3 inferred, 3 assumed, "
+        "1 table, unverified\n"
     )
 
 
@@ -92,7 +93,9 @@ def test_no_subcommand_is_a_usage_error() -> None:
 
 def test_check_quotes_template_passes(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check-quotes", str(TEMPLATE), str(FIXTURE)]) == 0
-    assert capsys.readouterr().out == "all 11 quotes found\n"
+    assert capsys.readouterr().out == (
+        "all 11 quotes found, 1 table value skipped (not quotable)\n"
+    )
 
 
 def test_check_quotes_reports_each_failure(

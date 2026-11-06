@@ -22,6 +22,7 @@ class Provenance(StrEnum):
     STATED = "stated"
     INFERRED = "inferred"
     ASSUMED = "assumed"
+    TABLE = "table"
 
 
 class Subject(StrEnum):
@@ -77,16 +78,25 @@ class _Frozen(BaseModel):
 
 
 class Source(_Frozen):
-    """The origin of one value: a quote, an inference, or an assumption."""
+    """The origin of one value: a quote, an inference, an assumption or a table cell.
+
+    A table source is a value read from a table or chart image, which has no text layer and so
+    cannot be quoted. The ``locator`` (row and column) says where to look, and a second
+    independent reading of the same cell takes the place of the quote check. A table source may
+    also carry a ``reason``, used for notes on the reading.
+    """
 
     kind: Provenance
     page: int | None = Field(default=None, ge=1)
     section: str | None = None
+    locator: str | None = None
     quote: str | None = None
     reason: str | None = None
 
     @model_validator(mode="after")
     def _check_kind_rules(self) -> Self:
+        if self.locator is not None and self.kind is not Provenance.TABLE:
+            raise ValueError("only a table source has a locator")
         match self.kind:
             case Provenance.STATED:
                 if self.page is None or self.quote is None:
@@ -101,6 +111,11 @@ class Source(_Frozen):
                     raise ValueError("an assumed source needs a reason")
                 if self.page is not None:
                     raise ValueError("an assumed source must not have a page")
+            case Provenance.TABLE:
+                if self.page is None or self.section is None or self.locator is None:
+                    raise ValueError("a table source needs page, section and locator")
+                if self.quote is not None:
+                    raise ValueError("a table source must not have a quote (it is not quotable)")
         return self
 
 
@@ -176,6 +191,7 @@ class StrategySpec(_Frozen):
     lookbacks_months: Cited[PositiveAscendingInts]
     top_n: Cited[PositiveAscendingInts]
     signal_lag_months: Cited[int]
+    metrics: dict[str, Cited[str]]
     claims: list[Claim]
 
     @model_validator(mode="after")
@@ -195,6 +211,8 @@ class StrategySpec(_Frozen):
                     problems.append(f"{claim.id}: top_n is not in top_n")
             if claim.period_start < start or claim.period_end > end:
                 problems.append(f"{claim.id}: period lies outside the sample")
+            if claim.metric not in self.metrics:
+                problems.append(f"{claim.id}: metric {claim.metric!r} has no entry in metrics")
         if problems:
             raise ValueError("; ".join(problems))
         return self
@@ -206,17 +224,19 @@ def load_spec(path: Path) -> StrategySpec:
 
 
 def sources(spec: StrategySpec) -> Iterator[tuple[str, Source]]:
-    """Every source in the spec, labelled by field name or claim id, in file order."""
+    """Every source in the spec, labelled by field name, ``metrics.<name>`` or claim id."""
     for name in type(spec).model_fields:
         field = getattr(spec, name)
         if isinstance(field, Cited):
             yield name, field.source
+    for metric, definition in spec.metrics.items():
+        yield f"metrics.{metric}", definition.source
     for claim in spec.claims:
         yield claim.id, claim.source
 
 
 def provenance_counts(spec: StrategySpec) -> dict[Provenance, int]:
-    """Count the sources of all cited fields and all claims, by provenance."""
+    """Count the sources of all cited fields, metric definitions and claims, by provenance."""
     counts = dict.fromkeys(Provenance, 0)
     for _, source in sources(spec):
         counts[source.kind] += 1

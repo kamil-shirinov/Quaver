@@ -4,7 +4,11 @@
 #   stated   - the paper says it. Give `page` (>= 1) and `quote` (at most 25 words, verbatim).
 #   inferred - the paper implies it. Give `page` and `reason` (how you got from the page to the value).
 #   assumed  - the paper does not say. Give `reason` only; `page` must be left out.
-# `section` is optional on any source. Page numbers refer to the PDF identified by pdf_sha256.
+#   table    - a value read off a table or chart image, which cannot be quoted. Give `page`,
+#              `section` (the exhibit name) and `locator` (row and column); `quote` must be null.
+#              `reason` is optional, for notes on the reading. check-quotes skips these, so get a
+#              second, independent reading and compare the two with `quaver compare-readings`.
+# `section` is optional on any source except table. Page numbers refer to the PDF identified by pdf_sha256.
 # Quote strings that could be read as numbers or dates (hashes, YYYY-MM) so YAML keeps them as text.
 
 paper:
@@ -135,6 +139,23 @@ signal_lag_months:
     page: 4
     quote: "We skip one month between the formation period and the holding period."
 
+# What each metric used by a claim means, in the paper's terms. Every claim's `metric` must be a
+# key here. Each definition is cited like any other value; if the paper never defines the
+# metric, say so with an `assumed` or `inferred` source rather than leaving it out.
+metrics:
+  mean_monthly_return:
+    value: "Arithmetic mean of the portfolio's monthly returns over the period"
+    source:
+      kind: inferred
+      page: 7
+      section: "Table 1"
+      reason: "Table 1 reports one figure per month for each portfolio; the paper does not define it, so the arithmetic mean is the natural reading."
+  annualised_volatility:
+    value: "Standard deviation of monthly returns, multiplied by the square root of 12"
+    source:
+      kind: assumed
+      reason: "The paper prints a volatility figure without saying how it is computed; this is the usual convention."
+
 # Headline numbers the replication will be checked against. Ids are C1, C2, ...
 # A claim is about the strategy or about the benchmark (`subject`). Strategy claims give
 # lookback_months and top_n, which must appear in the lists above; benchmark claims set both to null.
@@ -176,3 +197,20 @@ claims:
       page: 7
       section: "Table 1"
       quote: "The equal-weighted market portfolio earns 0.90 percent per month."
+  - id: "C3"
+    subject: "strategy"
+    statement: "The 12-month top-10 portfolio has annual volatility of 4.2 percent."
+    metric: "annualised_volatility"
+    lookback_months: 12
+    top_n: 10
+    period_start: "1960-01"
+    period_end: "1990-12"
+    value: 4.2
+    unit: "percent_per_year"
+    # A table value: the table is an image with no text layer, so there is no quote. The locator
+    # names the row and column to look at.
+    source:
+      kind: table
+      page: 7
+      section: "Table 1"
+      locator: "row Top-decile 12-month, column Volatility"

@@ -46,6 +46,14 @@ def words(n: int) -> str:
         {"kind": "stated", "page": 5, "quote": "q", "section": "Data"},
         {"kind": "inferred", "page": 2, "reason": "implied by Table 1"},
         {"kind": "assumed", "reason": "the paper is silent"},
+        {"kind": "table", "page": 8, "section": "Exhibit 4.5", "locator": "row CAGR, column Top3"},
+        {
+            "kind": "table",
+            "page": 8,
+            "section": "Exhibit 4.5",
+            "locator": "row CAGR, column Top3",
+            "reason": "a note on the reading",
+        },
     ],
 )
 def test_source_valid(fields: Data) -> None:
@@ -65,6 +73,16 @@ def test_source_valid(fields: Data) -> None:
         ({"kind": "stated", "page": 0, "quote": "q"}, "greater than or equal to 1"),
         ({"kind": "inferred", "page": -2, "reason": "r"}, "greater than or equal to 1"),
         ({"kind": "guessed", "reason": "r"}, "Input should be"),
+        ({"kind": "table", "section": "E", "locator": "l"}, "table source needs page, section"),
+        ({"kind": "table", "page": 1, "locator": "l"}, "table source needs page, section"),
+        ({"kind": "table", "page": 1, "section": "E"}, "table source needs page, section"),
+        (
+            {"kind": "table", "page": 1, "section": "E", "locator": "l", "quote": "q"},
+            "table source must not have a quote",
+        ),
+        ({"kind": "stated", "page": 1, "quote": "q", "locator": "l"}, "only a table source has"),
+        ({"kind": "inferred", "page": 1, "reason": "r", "locator": "l"}, "only a table source"),
+        ({"kind": "assumed", "reason": "r", "locator": "l"}, "only a table source has a locator"),
     ],
 )
 def test_source_invalid(fields: Data, message: str) -> None:
@@ -304,7 +322,11 @@ def test_template_loads() -> None:
     spec = load_spec(TEMPLATE)
     assert spec.paper.title == "Example Paper"
     assert spec.paper.year == 2000
-    assert [claim.subject for claim in spec.claims] == [Subject.STRATEGY, Subject.BENCHMARK]
+    assert [claim.subject for claim in spec.claims] == [
+        Subject.STRATEGY,
+        Subject.BENCHMARK,
+        Subject.STRATEGY,
+    ]
     assert spec.extraction.method is ExtractionMethod.HAND
 
 
@@ -356,9 +378,9 @@ def test_int_lists_invalid(field: str, values: list[int], message: str) -> None:
 def test_claim_ids_unique() -> None:
     data = template_data()
     third = copy.deepcopy(data["claims"][0])
-    third["id"] = "C3"
+    third["id"] = "C4"
     data["claims"].append(third)
-    assert len(StrategySpec.model_validate(data).claims) == 3
+    assert len(StrategySpec.model_validate(data).claims) == 4
     third["id"] = "C1"
     with pytest.raises(ValidationError, match="claim ids must be unique"):
         StrategySpec.model_validate(data)
@@ -420,21 +442,89 @@ def test_load_spec_rejects_non_mapping(tmp_path: Path) -> None:
 
 def test_provenance_counts_template() -> None:
     counts = provenance_counts(load_spec(TEMPLATE))
-    assert counts == {Provenance.STATED: 11, Provenance.INFERRED: 2, Provenance.ASSUMED: 2}
+    assert counts == {
+        Provenance.STATED: 11,
+        Provenance.INFERRED: 3,
+        Provenance.ASSUMED: 3,
+        Provenance.TABLE: 1,
+    }
 
 
 def test_provenance_counts_includes_zero_entries() -> None:
     data = template_data()
     data["claims"] = []
+    data["metrics"] = {}
     for field in data.values():
         if isinstance(field, dict) and "source" in field:
             field["source"] = {"kind": "assumed", "reason": "r"}
     counts = provenance_counts(StrategySpec.model_validate(data))
-    assert counts == {Provenance.STATED: 0, Provenance.INFERRED: 0, Provenance.ASSUMED: 13}
+    assert counts == {
+        Provenance.STATED: 0,
+        Provenance.INFERRED: 0,
+        Provenance.ASSUMED: 13,
+        Provenance.TABLE: 0,
+    }
 
 
-def test_sources_labels_fields_and_claims_in_order() -> None:
+def test_sources_labels_fields_metrics_and_claims_in_order() -> None:
     labels = [where for where, _ in sources(load_spec(TEMPLATE))]
     assert labels[0] == "universe"
-    assert labels[-3:] == ["signal_lag_months", "C1", "C2"]
-    assert len(labels) == 15
+    assert labels[-6:] == [
+        "signal_lag_months",
+        "metrics.mean_monthly_return",
+        "metrics.annualised_volatility",
+        "C1",
+        "C2",
+        "C3",
+    ]
+    assert len(labels) == 18
+
+
+# --- metrics --------------------------------------------------------------------------------
+
+
+def test_template_metrics_and_table_claim() -> None:
+    spec = load_spec(TEMPLATE)
+    assert list(spec.metrics) == ["mean_monthly_return", "annualised_volatility"]
+    table_claim = spec.claims[2]
+    assert table_claim.source.kind is Provenance.TABLE
+    assert table_claim.source.quote is None
+    assert table_claim.source.locator == "row Top-decile 12-month, column Volatility"
+
+
+def test_claim_metric_needs_an_entry() -> None:
+    data = template_data()
+    del data["metrics"]["annualised_volatility"]
+    with pytest.raises(
+        ValidationError, match="C3: metric 'annualised_volatility' has no entry in metrics"
+    ):
+        StrategySpec.model_validate(data)
+
+
+def test_every_claim_without_an_entry_is_reported() -> None:
+    data = template_data()
+    data["metrics"] = {}
+    with pytest.raises(ValidationError) as info:
+        StrategySpec.model_validate(data)
+    message = str(info.value)
+    assert all(f"{claim_id}: metric" in message for claim_id in ("C1", "C2", "C3"))
+
+
+def test_metrics_block_is_required() -> None:
+    data = template_data()
+    del data["metrics"]
+    with pytest.raises(ValidationError, match="metrics"):
+        StrategySpec.model_validate(data)
+
+
+def test_metric_definition_needs_a_source() -> None:
+    data = template_data()
+    del data["metrics"]["mean_monthly_return"]["source"]
+    with pytest.raises(ValidationError, match=r"metrics\.mean_monthly_return\.source"):
+        StrategySpec.model_validate(data)
+
+
+def test_metric_without_claims_is_allowed() -> None:
+    data = template_data()
+    data["metrics"]["unused"] = {"value": "v", "source": {"kind": "assumed", "reason": "r"}}
+    assert "unused" in StrategySpec.model_validate(data).metrics
